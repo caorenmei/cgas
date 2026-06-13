@@ -11,3 +11,6 @@ local lua_cpath = tree .. "/lib/lua/5.4/?.so"
 
 package.path = lua_path .. ";" .. lua_init .. ";" .. package.path
 package.cpath = lua_cpath .. ";" .. package.cpath
+
+-- Add lua_lib paths for cgas modules
+package.path = root .. "/lua_lib/?.lua;" .. root .. "/lua_lib/?/init.lua;" .. package.path

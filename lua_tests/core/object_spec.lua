@@ -1,0 +1,31 @@
+require("lua_tests.support.env")
+local object = require("cgas.core.object")
+
+describe("cgas.core.object", function()
+    it("generates monotonically increasing handles", function()
+        local h1 = object.next_handle()
+        local h2 = object.next_handle()
+        assert.is_number(h1)
+        assert.is_number(h2)
+        assert.is_true(h2 > h1)
+    end)
+
+    it("registers and retrieves instances by handle", function()
+        local handle = object.next_handle()
+        local instance = { name = "test" }
+        object.register(handle, instance)
+        assert.equal(instance, object.get(handle))
+    end)
+
+    it("returns nil for unregistered handles", function()
+        local h = object.next_handle()
+        assert.is_nil(object.get(h))
+    end)
+
+    it("allows unregister", function()
+        local h = object.next_handle()
+        object.register(h, {})
+        object.unregister(h)
+        assert.is_nil(object.get(h))
+    end)
+end)
