@@ -191,6 +191,16 @@ function ASC:apply_effect(spec)
             level = spec.level or 1,
         })
         active:apply_instant()
+        if effect.granted_tags then
+            for _, t in pairs(effect.granted_tags.tags) do
+                self:add_tag(t)
+            end
+        end
+        if effect.removed_tags then
+            for _, t in pairs(effect.removed_tags.tags) do
+                self:remove_tag(t)
+            end
+        end
         self.event_bus:emit("on_effect_applied", { effect = effect, target = self, source = spec.source })
         self.cue_manager:trigger_effect_cues(effect, "on_apply", { target = self, source = spec.source })
         return active.handle, nil
@@ -204,6 +214,16 @@ function ASC:apply_effect(spec)
     })
     active:on_apply()
     self.active_effects[active.handle] = active
+    if effect.granted_tags then
+        for _, t in pairs(effect.granted_tags.tags) do
+            self:add_tag(t)
+        end
+    end
+    if effect.removed_tags then
+        for _, t in pairs(effect.removed_tags.tags) do
+            self:remove_tag(t)
+        end
+    end
     self.event_bus:emit("on_effect_applied", { effect = effect, target = self, source = spec.source, handle = active.handle })
     self.cue_manager:trigger_effect_cues(effect, "on_apply", { target = self, source = spec.source })
     return active.handle, nil
@@ -242,6 +262,16 @@ function ASC:remove_active_effect(active_effect_handle)
     local active = self.active_effects[active_effect_handle]
     if not active then return false end
     self.active_effects[active_effect_handle] = nil
+    if active.effect.granted_tags then
+        for _, t in pairs(active.effect.granted_tags.tags) do
+            self:remove_tag(t)
+        end
+    end
+    if active.effect.removed_tags then
+        for _, t in pairs(active.effect.removed_tags.tags) do
+            self:add_tag(t)
+        end
+    end
     self.event_bus:emit("on_effect_removed", { effect = active.effect, target = self, handle = active.handle })
     self.cue_manager:trigger_effect_cues(active.effect, "on_remove", { target = self })
     return true

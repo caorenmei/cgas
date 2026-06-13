@@ -176,7 +176,8 @@ function ActiveGameplayEffect:_apply_modifiers()
         return
     end
     for _, mod in ipairs(self.effect.modifiers) do
-        local attribute = self.target_set:get(mod.attribute_name)
+        local attr_name = mod.attribute_name:match("[^%.]+$") or mod.attribute_name
+        local attribute = self.target_set:get(attr_name)
         if attribute then
             if mod.op == "add" then
                 attribute.current_value = attribute.current_value + mod.magnitude

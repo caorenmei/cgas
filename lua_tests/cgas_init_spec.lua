@@ -1,0 +1,15 @@
+require("lua_tests.support.env")
+local cgas = require("cgas")
+
+describe("cgas library entry", function()
+    it("exports core modules", function()
+        assert.is_function(cgas.ASC.new)
+        assert.is_function(cgas.GameplayAbility.new)
+        assert.is_function(cgas.GameplayEffect.new)
+    end)
+
+    it("creates ASC via factory", function()
+        local a = cgas.create_asc()
+        assert.is_not_nil(a)
+    end)
+end)
