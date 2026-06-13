@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # busted wrapper with local library paths and luarocks loader context
-LUA_PATH="lua_modules/share/lua/5.4/?.lua;lua_modules/share/lua/5.4/?/init.lua;${LUA_PATH:-}"
+LUA_PATH="lua_modules/share/lua/5.4/?.lua;lua_modules/share/lua/5.4/?/init.lua;./?.lua;./?/init.lua;${LUA_PATH:-}"
 LUA_CPATH="lua_modules/lib/lua/5.4/?.so;${LUA_CPATH:-}"
 
 export LUA_PATH
 export LUA_CPATH
 
-exec lua5.4 -e 'package.path="lua_modules/share/lua/5.4/?.lua;lua_modules/share/lua/5.4/?/init.lua;"..package.path;package.cpath="lua_modules/lib/lua/5.4/?.so;"..package.cpath;local k,l,_=pcall(require,"luarocks.loader") _=k and l.add_context("busted","2.3.0-1")' lua_modules/lib/luarocks/rocks-5.4/busted/2.3.0-1/bin/busted "$@"
+exec lua5.4 -e 'package.path="lua_modules/share/lua/5.4/?.lua;lua_modules/share/lua/5.4/?/init.lua;./?.lua;./?/init.lua;"..package.path;package.cpath="lua_modules/lib/lua/5.4/?.so;"..package.cpath;local k,l,_=pcall(require,"luarocks.loader") _=k and l.add_context("busted","2.3.0-1")' lua_modules/lib/luarocks/rocks-5.4/busted/2.3.0-1/bin/busted "$@"
