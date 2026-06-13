@@ -28,3 +28,6 @@ Thumbs.db
 .claude/settings.local.json
 /luarocks
 /lua
+
+# Git worktrees
+/.worktrees
