@@ -28,7 +28,7 @@ cgameplay/
 - **Lua 5.4** — 解释执行，无需编译
 - **LuaRocks** — 本地依赖管理（`lua_modules/`）
 - **busted** — 单元测试框架
-- **LuaLs** — Lua 语言服务器（`.luarc.json`），提供代码补全、诊断、格式化、类型注释等功能，类型注释参考 @docs/books/LuaCATS-annotations.md
+- **lua-lsp** — Lua 语言服务器（`.luarc.json`），提供代码补全、诊断、格式化、类型注释等功能，类型注释参考 @docs/books/LuaCATS-annotations.md
 - **便利脚本**：`./lua`（带本地路径的 REPL）、`./luarocks`（本地依赖管理）
 
 ## 开发工作流
@@ -37,7 +37,6 @@ cgameplay/
   - 主工作区保持 `main` 分支。
   - 各 worktree 独立运行，互不干扰。
   - 详细流程见 skill。
-- **Superpowers**：复杂或多步骤任务（非简单原子任务）启动前，询问用户是否启用 Superpowers 工作流执行。
 
 ## 测试环境
 
