@@ -1,0 +1,60 @@
+{
+    "runtime.version": "Lua 5.4",
+    "runtime.path": [
+        "lua_lib/?.lua",
+        "lua_lib/?/init.lua",
+        "lua_tools/?.lua",
+        "lua/?/init.lua",
+        "?/init.lua",
+        "?.lua"
+    ],
+    "runtime.pathStrict": false,
+
+    "workspace.library": [
+        "lua_modules/share/lua/5.4",
+        "lua_modules/lib/lua/5.4"
+    ],
+    "workspace.checkThirdParty": false,
+    "workspace.ignoreDir": [
+        ".git",
+        ".claude",
+        "lua_modules",
+        "docs/books"
+    ],
+    "workspace.useGitIgnore": true,
+
+    "diagnostics.enable": true,
+    "diagnostics.globals": [
+        "describe",
+        "it",
+        "before_each",
+        "after_each",
+        "setup",
+        "teardown",
+        "pending",
+        "assert"
+    ],
+    "diagnostics.disable": [
+        "undefined-field"
+    ],
+    "diagnostics.severity": {
+        "redefined-local": "Warning",
+        "unused-local": "Warning",
+        "unused-function": "Warning"
+    },
+
+    "completion.enable": true,
+    "completion.callSnippet": "Replace",
+    "completion.keywordSnippet": "Replace",
+
+    "hint.enable": true,
+    "hint.setType": true,
+    "hint.paramType": true,
+    "hint.paramName": "All",
+    "hint.arrayIndex": "Disable",
+    "hint.await": true,
+
+    "format.enable": true,
+
+    "telemetry.enable": false
+}

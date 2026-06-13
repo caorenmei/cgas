@@ -1,0 +1,30 @@
+# LuaRocks / Lua 依赖
+/lua_modules
+/.luarocks
+*.rock
+*.rockspec.lock
+
+# Lua 编译/缓存
+*.lua~
+luac.out
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 编辑器/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志与临时文件
+*.log
+/tmp
+
+# Claude Code 本地配置（如未纳入版本管理）
+.claude/local*
+.claude/settings.local.json
+/luarocks
+/lua
