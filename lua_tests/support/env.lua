@@ -1,7 +1,6 @@
 -- Test environment setup: configure package paths for local LuaRocks tree
 -- No extra runtime dependencies introduced.
 
-local path_sep = package.config:sub(1, 1) -- '/' on Unix, '\\' on Windows
 local root = debug.getinfo(1, "S").source:sub(2)
 root = root:match("^(.*)[/\\]lua_tests[/\\].*$") or "."
 

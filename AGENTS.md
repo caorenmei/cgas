@@ -38,6 +38,9 @@ cgameplay/
   - 各 worktree 独立运行，互不干扰。
   - 详细流程见 skill。
 
+- **TDD**：新功能、Bug 修复、重构均遵循红-绿-重构循环。先写失败的测试，再写最小实现使其通过，最后重构。
+- **静态诊断**：提交前运行 `lua-language-server --check . --configpath .luarc.json`，确保无诊断问题。
+
 ## 测试环境
 
 - **busted** — 测试框架，测试文件以 `*_spec.lua` 命名
