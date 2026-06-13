@@ -3,24 +3,30 @@
 local M = {}
 local object = require("cgas.core.object")
 
----@class GameplayEffect
+---@class cgas.semantics.GameplayEffect
 ---@field name string
----@field duration_policy "instant" | "duration" | "infinite"
----@field duration table?  -- { type = "scalable_float", value = number }
+---@field duration_policy "instant"|"duration"|"infinite"
+---@field duration cgas.semantics.Magnitude?
 ---@field period number?
 ---@field periodic_instant boolean?
----@field modifiers table[]
----@field granted_tags table?
----@field removed_tags table?
----@field queries table?
----@field stacking_policy string?
----@field stack_limit number?
+---@field modifiers cgas.semantics.Modifier[]
+---@field granted_tags cgas.semantics.GameplayTagContainer?
+---@field removed_tags cgas.semantics.GameplayTagContainer?
+---@field application_required_tags cgas.semantics.GameplayTagQuery?
+---@field application_immunity_tags cgas.semantics.GameplayTagQuery?
+---@field stacking_policy "none"|"aggregate_by_source"|"aggregate_by_target"?
+---@field stack_limit integer?
+---@field stack_refresh "duration"|"magnitude"|"both"?
+---@field private _stack_count integer
 local GameplayEffect = {}
 GameplayEffect.__index = GameplayEffect
+M.GameplayEffect = GameplayEffect
 
---- 创建 GameplayEffect 定义
+---@alias cgas.semantics.Magnitude { type: "scalable_float", value: number, curve: table? } | { type: "attribute_based", attribute: string, coefficient: number, pre_multiply: boolean } | { type: "custom", func: fun(ctx: table): number }
+
+---创建 GameplayEffect 定义
 ---@param spec table
----@return GameplayEffect
+---@return cgas.semantics.GameplayEffect
 function GameplayEffect.new(spec)
     local self = setmetatable({}, GameplayEffect)
     self.name = spec.name or "UnnamedEffect"
@@ -31,24 +37,28 @@ function GameplayEffect.new(spec)
     self.modifiers = spec.modifiers or {}
     self.granted_tags = spec.granted_tags
     self.removed_tags = spec.removed_tags
-    self.queries = spec.queries
+    self.application_required_tags = spec.application_required_tags
+    self.application_immunity_tags = spec.application_immunity_tags
     self.stacking_policy = spec.stacking_policy
     self.stack_limit = spec.stack_limit or 1
+    self.stack_refresh = spec.stack_refresh or "duration"
     self._stack_count = 0
     return self
 end
 
----@class ActiveGameplayEffect
----@field handle number
----@field effect GameplayEffect
----@field target_set table?
----@field source_set table?
----@field level number
+---@class cgas.semantics.ActiveGameplayEffect
+---@field handle integer
+---@field effect cgas.semantics.GameplayEffect
+---@field target_set cgas.semantics.AttributeSet?
+---@field source_set cgas.semantics.AttributeSet?
+---@field level integer
 ---@field start_time number
 ---@field duration number
 ---@field period_timer number
 ---@field is_active boolean
 local ActiveGameplayEffect = {}
+ActiveGameplayEffect.__index = ActiveGameplayEffect
+M.ActiveGameplayEffect = ActiveGameplayEffect
 
 function ActiveGameplayEffect.__index(t, k)
     if k == "stack_count" then
@@ -65,9 +75,9 @@ function ActiveGameplayEffect.__newindex(t, k, v)
     end
 end
 
---- 创建 ActiveGameplayEffect 运行时实例
+---创建 ActiveGameplayEffect 运行时实例
 ---@param opts table
----@return ActiveGameplayEffect
+---@return cgas.semantics.ActiveGameplayEffect
 function ActiveGameplayEffect.new(opts)
     local self = setmetatable({}, ActiveGameplayEffect)
     self.handle = object.next_handle()
@@ -82,7 +92,7 @@ function ActiveGameplayEffect.new(opts)
     return self
 end
 
---- 应用即时效果（不进入激活列表）
+---应用即时效果（不进入激活列表）
 function ActiveGameplayEffect:apply_instant()
     if self.effect.duration_policy ~= "instant" then
         return
@@ -90,7 +100,7 @@ function ActiveGameplayEffect:apply_instant()
     self:_apply_modifiers()
 end
 
---- 进入激活状态并应用效果
+---进入激活状态并应用效果
 function ActiveGameplayEffect:on_apply()
     self.is_active = true
     self.start_time = 0
@@ -116,7 +126,7 @@ function ActiveGameplayEffect:on_apply()
     end
 end
 
---- 更新效果状态（dt 为时间增量）
+---更新效果状态（dt 为时间增量）
 ---@param dt number
 function ActiveGameplayEffect:update(dt)
     if not self.is_active then
@@ -128,7 +138,7 @@ function ActiveGameplayEffect:update(dt)
     -- 处理周期性触发
     if self.effect.period and self.effect.period > 0 then
         self.period_timer = self.period_timer + dt
-        
+
         -- 对于 periodic_instant，使用 ceil(dt/period) 计算触发次数
         if self.effect.periodic_instant then
             local times = math.ceil(dt / self.effect.period)
@@ -151,7 +161,7 @@ function ActiveGameplayEffect:update(dt)
     end
 end
 
---- 检查效果是否已过期
+---检查效果是否已过期
 ---@return boolean
 function ActiveGameplayEffect:is_expired()
     if self.effect.duration_policy == "instant" then
@@ -163,14 +173,14 @@ function ActiveGameplayEffect:is_expired()
     return self.start_time >= self.duration
 end
 
---- 检查堆叠是否达到上限
+---检查堆叠是否达到上限
 ---@return boolean
 function ActiveGameplayEffect:is_stack_at_limit()
     local limit = self.effect.stack_limit or 1
     return self.stack_count >= limit
 end
 
---- 内部：应用修饰器到目标属性集
+---内部：应用修饰器到目标属性集
 function ActiveGameplayEffect:_apply_modifiers()
     if not self.target_set then
         return
@@ -192,7 +202,26 @@ function ActiveGameplayEffect:_apply_modifiers()
     end
 end
 
-M.GameplayEffect = GameplayEffect
-M.ActiveGameplayEffect = ActiveGameplayEffect
+M.resolve_magnitude = function(magnitude, level, source_set, target_set)
+    if magnitude.type == "scalable_float" then
+        return magnitude.value
+    elseif magnitude.type == "attribute_based" then
+        local attr = nil
+        if source_set and source_set:get(magnitude.attribute) then
+            attr = source_set:get(magnitude.attribute)
+        elseif target_set and target_set:get(magnitude.attribute) then
+            attr = target_set:get(magnitude.attribute)
+        end
+        local base = attr and attr.current_value or 0
+        if magnitude.pre_multiply then
+            return base * magnitude.coefficient
+        else
+            return base + magnitude.coefficient
+        end
+    elseif magnitude.type == "custom" then
+        return magnitude.func({ level = level, source_set = source_set, target_set = target_set })
+    end
+    return 0
+end
 
 return M

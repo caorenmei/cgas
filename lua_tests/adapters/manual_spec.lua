@@ -5,6 +5,8 @@ local asc = require("cgas.semantics.asc")
 describe("cgas.adapters.manual", function()
     it("creates a runner that updates ASC", function()
         local a = asc.ASC.new({})
+        assert.is_not_nil(a)
+        ---@cast a cgas.semantics.ASC
         local runner = manual.new(a)
         assert.is_function(runner.update)
         runner:update(0.1)
@@ -13,6 +15,8 @@ describe("cgas.adapters.manual", function()
 
     it("destroys cleanly", function()
         local a = asc.ASC.new({})
+        assert.is_not_nil(a)
+        ---@cast a cgas.semantics.ASC
         local runner = manual.new(a)
         runner:destroy()
     end)

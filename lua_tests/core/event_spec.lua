@@ -10,6 +10,8 @@ describe("cgas.core.event", function()
         end)
         bus:emit("test", { value = 42 })
         bus:dispatch()
+        assert.is_not_nil(received)
+        ---@cast received table
         assert.equal(42, received.value)
     end)
 

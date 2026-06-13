@@ -47,7 +47,9 @@ M.net_event = require("cgas.net.event")
 ---@param opts table?
 ---@return cgas.semantics.ASC
 function M.create_asc(opts)
-    return M.ASC.new(opts or {})
+    local asc = M.ASC.new(opts or {})
+    ---@cast asc cgas.semantics.ASC
+    return asc
 end
 
 return M

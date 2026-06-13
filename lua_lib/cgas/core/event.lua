@@ -3,17 +3,25 @@
 --- Listeners are isolated via pcall so one failing listener does not break others.
 
 local M = {}
-M.__index = M
 
---- Create a new EventBus.
----@return EventBus
-function M.new()
-    local self = setmetatable({}, M)
-    self._listeners = {}       -- event_name -> { [id] = callback }
-    self._queue = {}           -- array of { name, payload }
+---@class cgas.core.EventBus
+---@field private _listeners table<string, table<integer, function>>
+---@field private _queue table<integer, {name: string, payload: table}>
+---@field private _next_id integer
+---@field private _dispatching boolean
+---@field private _pending table<integer, {name: string, payload: table}>
+local EventBus = M
+EventBus.__index = EventBus
+
+---Create a new EventBus.
+---@return cgas.core.EventBus
+function EventBus.new()
+    local self = setmetatable({}, EventBus)
+    self._listeners = {}
+    self._queue = {}
     self._next_id = 0
     self._dispatching = false
-    self._pending = {}         -- queue for events emitted during dispatch
+    self._pending = {}
     return self
 end
 
@@ -21,7 +29,7 @@ end
 ---@param event_name string
 ---@param callback function
 ---@return integer id
-function M:subscribe(event_name, callback)
+function EventBus:subscribe(event_name, callback)
     self._next_id = self._next_id + 1
     local id = self._next_id
     if not self._listeners[event_name] then
@@ -33,7 +41,7 @@ end
 
 --- Unsubscribe by id.
 ---@param id integer
-function M:unsubscribe(id)
+function EventBus:unsubscribe(id)
     for event_name, listeners in pairs(self._listeners) do
         if listeners[id] then
             listeners[id] = nil
@@ -54,7 +62,7 @@ end
 --- Emit an event (queued, not dispatched immediately).
 ---@param event_name string
 ---@param payload table
-function M:emit(event_name, payload)
+function EventBus:emit(event_name, payload)
     if self._dispatching then
         table.insert(self._pending, { name = event_name, payload = payload })
     else
@@ -63,7 +71,7 @@ function M:emit(event_name, payload)
 end
 
 --- Dispatch all queued events.
-function M:dispatch()
+function EventBus:dispatch()
     -- Swap queue
     local queue = self._queue
     self._queue = {}
@@ -73,9 +81,9 @@ function M:dispatch()
         local listeners = self._listeners[event.name]
         if listeners then
             for _, callback in pairs(listeners) do
-                local ok, err = pcall(callback, event.payload)
+                local ok = pcall(callback, event.payload)
                 if not ok then
-                    -- Error isolation: silently swallow errors
+                    print("[cgas.event] listener error")
                 end
             end
         end

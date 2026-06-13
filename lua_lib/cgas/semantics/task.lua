@@ -43,8 +43,9 @@ function AbilityTask:finish(result)
 end
 
 ---Update the task.
----@param dt number
-function AbilityTask:update(dt)
+---@param _dt number
+---@diagnostic disable-next-line: unused-local
+function AbilityTask:update(_dt)
     -- override in subclasses
 end
 
@@ -61,6 +62,7 @@ function TaskWaitDelay.new(ability, delay)
     local t = setmetatable(AbilityTask.new(ability), TaskWaitDelay)
     t.delay = delay
     t.elapsed = 0
+    ---@cast t cgas.semantics.TaskWaitDelay
     return t
 end
 
@@ -84,7 +86,9 @@ TaskWaitInputRelease.__index = TaskWaitInputRelease
 ---@param ability cgas.semantics.GameplayAbility
 ---@return cgas.semantics.TaskWaitInputRelease
 function TaskWaitInputRelease.new(ability)
-    return setmetatable(AbilityTask.new(ability), TaskWaitInputRelease)
+    local t = setmetatable(AbilityTask.new(ability), TaskWaitInputRelease)
+    ---@cast t cgas.semantics.TaskWaitInputRelease
+    return t
 end
 
 function TaskWaitInputRelease:start()
@@ -103,6 +107,7 @@ TaskWaitGameplayEvent.__index = TaskWaitGameplayEvent
 function TaskWaitGameplayEvent.new(ability, event_name)
     local t = setmetatable(AbilityTask.new(ability), TaskWaitGameplayEvent)
     t.event_name = event_name
+    ---@cast t cgas.semantics.TaskWaitGameplayEvent
     return t
 end
 
@@ -128,7 +133,9 @@ TaskWaitAbilityCommit.__index = TaskWaitAbilityCommit
 ---@param ability cgas.semantics.GameplayAbility
 ---@return cgas.semantics.TaskWaitAbilityCommit
 function TaskWaitAbilityCommit.new(ability)
-    return setmetatable(AbilityTask.new(ability), TaskWaitAbilityCommit)
+    local t = setmetatable(AbilityTask.new(ability), TaskWaitAbilityCommit)
+    ---@cast t cgas.semantics.TaskWaitAbilityCommit
+    return t
 end
 
 function TaskWaitAbilityCommit:start()

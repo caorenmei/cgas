@@ -9,6 +9,8 @@ local effect_mod = require("cgas.semantics.effect")
 local ability_mod = require("cgas.semantics.ability")
 local cue_mod = require("cgas.semantics.cue")
 
+---@class cgas.semantics.GameplayEffectSpec
+
 local M = {}
 
 ---@class cgas.semantics.ASC
@@ -187,7 +189,7 @@ function ASC:apply_effect(spec)
         local active = effect_mod.ActiveGameplayEffect.new({
             effect = effect,
             target_set = self:_resolve_attribute_set(effect),
-            source_set = spec.source and self:_source_attribute_set(spec.source, effect),
+            source_set = spec.source and self:_source_attribute_set(effect),
             level = spec.level or 1,
         })
         active:apply_instant()
@@ -209,7 +211,7 @@ function ASC:apply_effect(spec)
     local active = effect_mod.ActiveGameplayEffect.new({
         effect = effect,
         target_set = self:_resolve_attribute_set(effect),
-        source_set = spec.source and self:_source_attribute_set(spec.source, effect),
+        source_set = spec.source and self:_source_attribute_set(effect),
         level = spec.level or 1,
     })
     active:on_apply()
@@ -248,10 +250,9 @@ function ASC:_resolve_attribute_set(effect)
 end
 
 ---@private
----@param source_asc cgas.semantics.ASC
 ---@param effect cgas.semantics.GameplayEffect
 ---@return cgas.semantics.AttributeSet|nil
-function ASC:_source_attribute_set(source_asc, effect)
+function ASC:_source_attribute_set(effect)
     return self:_resolve_attribute_set(effect)
 end
 

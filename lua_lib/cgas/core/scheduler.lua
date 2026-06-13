@@ -2,40 +2,46 @@
 --- Error isolation via pcall ensures one failing callback does not break others.
 
 local M = {}
-M.__index = M
 
---- Create a new Scheduler.
----@return Scheduler
-function M.new()
-    local self = setmetatable({}, M)
-    self._tick_callbacks = {}  -- id -> { priority = number, callback = function }
-    self._jobs = {}            -- id -> { type = "defer"|"every", callback = function, interval = number, elapsed = number }
+---@class cgas.core.Scheduler
+---@field private _tick_callbacks table<integer, {priority: number, callback: function}>
+---@field private _jobs table<integer, {type: string, callback: function, interval: number, elapsed: number}>
+---@field private _next_id integer
+local Scheduler = M
+Scheduler.__index = Scheduler
+
+---Create a new Scheduler.
+---@return cgas.core.Scheduler
+function Scheduler.new()
+    local self = setmetatable({}, Scheduler)
+    self._tick_callbacks = {}
+    self._jobs = {}
     self._next_id = 0
     return self
 end
 
---- Register a tick callback with optional priority (lower = earlier).
+---Register a tick callback with optional priority (lower = earlier).
 ---@param id integer
 ---@param callback function
 ---@param priority? number
-function M:register(id, callback, priority)
+function Scheduler:register(id, callback, priority)
     self._tick_callbacks[id] = {
         priority = priority or 0,
         callback = callback,
     }
 end
 
---- Unregister a tick callback.
+---Unregister a tick callback.
 ---@param id integer
-function M:unregister(id)
+function Scheduler:unregister(id)
     self._tick_callbacks[id] = nil
 end
 
---- Defer a callback after a delay.
+---Defer a callback after a delay.
 ---@param callback function
 ---@param delay number
 ---@return integer id
-function M:defer(callback, delay)
+function Scheduler:defer(callback, delay)
     self._next_id = self._next_id + 1
     local id = self._next_id
     self._jobs[id] = {
@@ -47,11 +53,11 @@ function M:defer(callback, delay)
     return id
 end
 
---- Schedule a periodic callback.
+---Schedule a periodic callback.
 ---@param callback function
 ---@param interval number
 ---@return integer id
-function M:every(callback, interval)
+function Scheduler:every(callback, interval)
     self._next_id = self._next_id + 1
     local id = self._next_id
     self._jobs[id] = {
@@ -63,15 +69,15 @@ function M:every(callback, interval)
     return id
 end
 
---- Cancel a deferred or periodic job.
+---Cancel a deferred or periodic job.
 ---@param id integer
-function M:cancel(id)
+function Scheduler:cancel(id)
     self._jobs[id] = nil
 end
 
---- Update the scheduler with delta time.
+---Update the scheduler with delta time.
 ---@param dt number
-function M:update(dt)
+function Scheduler:update(dt)
     -- Collect and sort tick callbacks by priority
     local callbacks = {}
     for _, entry in pairs(self._tick_callbacks) do
@@ -82,9 +88,9 @@ function M:update(dt)
     end)
 
     for _, entry in ipairs(callbacks) do
-        local ok, err = pcall(entry.callback, dt)
+        local ok = pcall(entry.callback, dt)
         if not ok then
-            -- Error isolation: silently swallow errors
+            print("[cgas.scheduler] tick error")
         end
     end
 
@@ -94,16 +100,16 @@ function M:update(dt)
         job.elapsed = job.elapsed + dt
         if job.elapsed >= job.interval then
             if job.type == "defer" then
-                local ok, err = pcall(job.callback)
+                local ok = pcall(job.callback)
                 if not ok then
-                    -- Error isolation
+                    print("[cgas.scheduler] job error")
                 end
                 table.insert(jobs_to_remove, id)
             elseif job.type == "every" then
                 job.elapsed = job.elapsed - job.interval
-                local ok, err = pcall(job.callback)
+                local ok = pcall(job.callback)
                 if not ok then
-                    -- Error isolation
+                    print("[cgas.scheduler] job error")
                 end
             end
         end

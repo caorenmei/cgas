@@ -1,6 +1,9 @@
 local object = require("cgas.core.object")
 local tag = require("cgas.semantics.tag")
 
+---@class cgas.semantics.ASC
+---@class cgas.semantics.AbilityTask
+
 local M = {}
 
 ---@class cgas.semantics.GameplayAbility

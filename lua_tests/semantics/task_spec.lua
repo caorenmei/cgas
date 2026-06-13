@@ -34,6 +34,8 @@ describe("cgas.semantics.task", function()
         local fake_ability = { asc = { event_bus = bus }, active_tasks = {} }
         local t = task.TaskWaitGameplayEvent.new(fake_ability, "my_event")
         t:start()
+        assert.is_not_nil(received)
+        ---@cast received {name: string, fn: fun(table)}
         assert.equal("my_event", received.name)
         received.fn({ value = 42 })
         assert.equal("finished", t.state)

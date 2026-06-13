@@ -26,7 +26,7 @@ describe("cgas.semantics.ability", function()
         local activated = false
         local ab = ability.GameplayAbility.new(asc, {
             name = "Fireball",
-            ActivateAbility = function(_self)
+            ActivateAbility = function()
                 activated = true
             end,
         })

@@ -9,8 +9,11 @@ describe("cgas.semantics.cue", function()
         mgr:register(tag.GameplayTag.new("cue.fire"), function(payload)
             received = payload
         end)
-        mgr:trigger(tag.GameplayTag.new("cue.fire"), { target = "x" })
-        assert.equal("x", received.target)
+        local target = { handle = 1 }
+        mgr:trigger(tag.GameplayTag.new("cue.fire"), { target = target })
+        assert.is_not_nil(received)
+        ---@cast received cgas.semantics.GameplayCuePayload
+        assert.equal(target, received.target)
     end)
 
     it("triggers effect cues by tag", function()
@@ -21,7 +24,7 @@ describe("cgas.semantics.cue", function()
         local c = tag.GameplayTagContainer.new()
         c:add(tag.GameplayTag.new("cue.fire"))
         Effect.granted_tags = c
-        mgr:trigger_effect_cues(Effect, "on_apply", {})
+        mgr:trigger_effect_cues(Effect, "on_apply", { target = ({ handle = 1 }) --[[@as cgas.semantics.ASC]] })
         assert.equal(1, count)
     end)
 end)

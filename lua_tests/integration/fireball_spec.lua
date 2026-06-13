@@ -65,14 +65,22 @@ describe("Fireball combo", function()
         }
 
         local ability_handle = player:give_ability(Fireball)
+        assert.is_number(ability_handle)
+        ---@cast ability_handle integer
 
         -- Cast
         assert.is_true(player:try_activate_ability(ability_handle))
-        assert.equal(80, player:get_attribute("ManaSet.Mana").current_value)
+        local mana = player:get_attribute("ManaSet.Mana")
+        assert.is_not_nil(mana)
+        ---@cast mana cgas.semantics.Attribute
+        assert.equal(80, mana.current_value)
 
         -- Wait for cast
         player:update(1.6)
-        assert.equal(70, target:get_attribute("HealthSet.Health").current_value)
+        local health = target:get_attribute("HealthSet.Health")
+        assert.is_not_nil(health)
+        ---@cast health cgas.semantics.Attribute
+        assert.equal(70, health.current_value)
 
         -- Try recast during cooldown
         assert.is_false(player:try_activate_ability(ability_handle))

@@ -50,9 +50,10 @@ end
 
 ---Trigger cues associated with an effect's granted tags.
 ---@param effect cgas.semantics.GameplayEffect
----@param timing "on_apply"|"on_remove"|"on_periodic"
+---@param _timing "on_apply"|"on_remove"|"on_periodic"
 ---@param payload cgas.semantics.GameplayCuePayload
-function GameplayCueManager:trigger_effect_cues(effect, timing, payload)
+---@diagnostic disable-next-line: unused-local
+function GameplayCueManager:trigger_effect_cues(effect, _timing, payload)
     if not effect.granted_tags then return end
     for tag_str, _ in pairs(effect.granted_tags.tags) do
         self:trigger(tag.GameplayTag.new(tag_str), payload)
