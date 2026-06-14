@@ -57,6 +57,7 @@ function ASC:_tick(raw_dt)
     self.time_source:advance(dt)
     self:_update_effects(dt)
     self:_update_abilities(dt)
+    self:_recalculate_attributes()
     self.event_bus:dispatch()
     self.event_bus:emit("on_post_update", { asc = self, dt = dt })
     self.event_bus:dispatch()
@@ -85,6 +86,22 @@ end
 function ASC:_update_abilities(dt)
     for _, ab in pairs(self.granted_abilities) do
         ab:update(dt)
+    end
+end
+
+---Recalculate current values of all attributes from active effect modifiers.
+function ASC:_recalculate_attributes()
+    local all_modifiers = {}
+    for _, active in pairs(self.active_effects) do
+        local mods = active:collect_modifiers()
+        for _, mod in ipairs(mods) do
+            table.insert(all_modifiers, mod)
+        end
+    end
+    for _, set in pairs(self.attribute_sets) do
+        for _, attribute in pairs(set.attributes) do
+            attribute:recalculate(all_modifiers)
+        end
     end
 end
 
@@ -189,10 +206,11 @@ function ASC:apply_effect(spec)
         local active = effect_mod.ActiveGameplayEffect.new({
             effect = effect,
             target_set = self:_resolve_attribute_set(effect),
-            source_set = spec.source and self:_source_attribute_set(effect),
+            source_set = spec.source and self:_source_attribute_set(effect, spec.source),
             level = spec.level or 1,
         })
         active:apply_instant()
+        self:_recalculate_attributes()
         if effect.granted_tags then
             for _, t in pairs(effect.granted_tags.tags) do
                 self:add_tag(t)
@@ -215,11 +233,12 @@ function ASC:apply_effect(spec)
     local active = effect_mod.ActiveGameplayEffect.new({
         effect = effect,
         target_set = self:_resolve_attribute_set(effect),
-        source_set = spec.source and self:_source_attribute_set(effect),
+        source_set = spec.source and self:_source_attribute_set(effect, spec.source),
         level = spec.level or 1,
     })
     active:on_apply()
     self.active_effects[active.handle] = active
+    self:_recalculate_attributes()
     if effect.granted_tags then
         for _, t in pairs(effect.granted_tags.tags) do
             self:add_tag(t)
@@ -259,9 +278,11 @@ end
 
 ---@private
 ---@param effect cgas.semantics.GameplayEffect
+---@param source cgas.semantics.ASC?
 ---@return cgas.semantics.AttributeSet|nil
-function ASC:_source_attribute_set(effect)
-    return self:_resolve_attribute_set(effect)
+function ASC:_source_attribute_set(effect, source)
+    source = source or self
+    return source:_resolve_attribute_set(effect)
 end
 
 ---Remove an active effect.
@@ -281,6 +302,7 @@ function ASC:remove_active_effect(active_effect_handle)
             self:add_tag(t)
         end
     end
+    self:_recalculate_attributes()
     self.event_bus:emit("on_effect_removed", { effect = active.effect, target = self, handle = active.handle })
     self.cue_manager:trigger_effect_cues(active.effect, "on_remove", { target = self })
     return true
