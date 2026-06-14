@@ -53,6 +53,14 @@ local function resolve(value, self)
     return ability_mod.resolve_value(value, self)
 end
 
+---判断对象是否为 AbilitySpec/EffectSpec/AttributeSpec
+---Spec 以 def_id 为标识，而 Def 以 id/name 为标识
+---@param obj any
+---@return boolean
+local function is_spec(obj)
+    return type(obj) == "table" and obj.def_id ~= nil and obj.id == nil and obj.name == nil
+end
+
 ---派发属性变化事件
 ---@param state mini_gas.EntityState
 ---@param attr_id mini_gas.AttributeId
@@ -66,14 +74,28 @@ local function notify_attr_changed(state, attr_id, old_value, new_value)
     })
 end
 
----注册属性定义
+---注册属性定义（支持 AttributeDef 或 AttributeSpec 混合）
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
----@param attr_defs mini_gas.AttributeDef[]
+---@param attr_defs mini_gas.AttributeDef[]|mini_gas.AttributeSpec[]
 function M.register_attributes(state, defs, attr_defs)
-    for _, def in ipairs(attr_defs or {}) do
+    for _, item in ipairs(attr_defs or {}) do
+        local def
+        if is_spec(item) then
+            ---@cast item mini_gas.AttributeSpec
+            def = defs.attribute_defs[item.def_id]
+            if not def then
+                log_mod.warn("register_attributes: attribute def not found: " .. tostring(item.def_id))
+                goto continue
+            end
+            -- AttributeSpec.level 目前仅作为元信息保留，base 值仍由 AttributeDef.base 决定
+        else
+            ---@cast item mini_gas.AttributeDef
+            def = item
+        end
         defs.attribute_defs[def.name] = def
         state.attributes[def.name] = attribute_mod.calc_base(def)
+        ::continue::
     end
 end
 
@@ -219,21 +241,36 @@ local function remove_granted_tags(state, tags, source)
     end
 end
 
----授予技能
+---授予技能（支持 GameplayAbilityDef 或 AbilitySpec）
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
----@param spec mini_gas.GameplayAbilityDef
----@param level number
----@param stack number|nil
-function M.give_ability(state, defs, spec, level, stack)
-    level = level or 1
-    stack = stack or 1
-    local key = ability_key(spec.id)
+---@param ability_def_or_spec mini_gas.GameplayAbilityDef|mini_gas.AbilitySpec
+---@param level number?
+---@param stack number?
+function M.give_ability(state, defs, ability_def_or_spec, level, stack)
+    local ability_def
+    if is_spec(ability_def_or_spec) then
+        ---@cast ability_def_or_spec mini_gas.AbilitySpec
+        ability_def = defs.ability_defs[ability_def_or_spec.def_id]
+        if not ability_def then
+            log_mod.warn("give_ability: ability def not found: " .. tostring(ability_def_or_spec.def_id))
+            return
+        end
+        level = ability_def_or_spec.level or level or 1
+        stack = ability_def_or_spec.stack or stack or 1
+    else
+        ---@cast ability_def_or_spec mini_gas.GameplayAbilityDef
+        ability_def = ability_def_or_spec
+        level = level or 1
+        stack = stack or 1
+    end
+
+    local key = ability_key(ability_def.id)
     if state.abilities[key] then
         return
     end
-    defs.ability_defs[spec.id] = spec
-    local ability = ability_mod.GameplayAbility.new(spec, level, stack)
+    defs.ability_defs[ability_def.id] = ability_def
+    local ability = ability_mod.GameplayAbility.new(ability_def, level, stack)
     state.abilities[key] = ability
 
     for _, tag in ipairs(ability.grant_tags or {}) do
@@ -242,14 +279,14 @@ function M.give_ability(state, defs, spec, level, stack)
 
     if ability.activation_policy == enum.EAbilityActivationPolicy.Reactive and ability.activation_event then
         local listener = function(payload)
-            M.try_activate_ability(state, defs, spec.id, payload)
+            M.try_activate_ability(state, defs, ability_def.id, payload)
         end
         ability.listener = listener
         event_mod.listen_event(state, ability.activation_event, listener)
     end
 
     if ability.activation_policy == enum.EAbilityActivationPolicy.Passive then
-        M.try_activate_ability(state, defs, spec.id)
+        M.try_activate_ability(state, defs, ability_def.id)
     end
 end
 
@@ -277,10 +314,9 @@ function M.remove_ability(state, ability_id)
 
     remove_granted_tags(state, ability.grant_tags or {}, key)
 
-    for _, effect in pairs(state.effects) do
-        if effect.source == ability_id then
-            M.remove_effect(state, effect.id)
-        end
+    -- 仅移除本技能在激活时产生的效果，避免误删业务方独立应用且 source 相同的效果
+    for _, effect_id in ipairs(ability.spawned_effects or {}) do
+        M.remove_effect(state, effect_id)
     end
 
     state.abilities[key] = nil
@@ -297,14 +333,7 @@ function M.set_ability_level(state, ability_id, level)
         return
     end
     ability.level = level
-    for _, effect in pairs(state.effects) do
-        if effect.source == ability_id then
-            effect.level = level
-            for _, mod in ipairs(effect.modifiers) do
-                mod.level = level
-            end
-        end
-    end
+    -- 技能的等级变化不自动级联到已产生的效果；效果等级应由效果自身或业务方独立管理
 end
 
 ---设置技能 Stack
@@ -318,14 +347,7 @@ function M.set_ability_stack(state, ability_id, stack)
         return
     end
     ability.stack = stack
-    for _, effect in pairs(state.effects) do
-        if effect.source == ability_id then
-            effect.stack = stack
-            for _, mod in ipairs(effect.modifiers) do
-                mod.stack = stack
-            end
-        end
-    end
+    -- 技能的 Stack 变化不自动级联到已产生的效果；效果 Stack 应由效果自身或业务方独立管理
 end
 
 ---结束技能
@@ -358,7 +380,9 @@ function M.try_activate_ability(state, defs, ability_id, payload)
         return false
     end
 
-    ability_mod.activate(ability)
+    if not ability_mod.activate(ability) then
+        return false
+    end
 
     if ability.cost then
         for attr_id, cost_value in pairs(ability.cost) do
@@ -377,6 +401,7 @@ function M.try_activate_ability(state, defs, ability_id, payload)
         end
         cloned.source = ability_id
         M.apply_effect(state, defs, cloned, ability.level, ability.stack)
+        table.insert(ability.spawned_effects, cloned.id)
     end
 
     event_mod.dispatch_event(state, enum.EGameplayEvent.AbilityActivated, {
@@ -474,55 +499,70 @@ local function apply_periodic_modifiers(state, defs, effect, count)
     end
 end
 
----应用效果
+---应用效果（支持 EffectDef 或 EffectSpec）
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
----@param spec mini_gas.EffectDef
----@param level number
----@param stack number|nil
-function M.apply_effect(state, defs, spec, level, stack)
-    level = level or 1
-    stack = stack or 1
-    local key = effect_key(spec.id)
-    defs.effect_defs[spec.id] = spec
+---@param effect_def_or_spec mini_gas.EffectDef|mini_gas.EffectSpec
+---@param level number?
+---@param stack number?
+function M.apply_effect(state, defs, effect_def_or_spec, level, stack)
+    local effect_def
+    if is_spec(effect_def_or_spec) then
+        ---@cast effect_def_or_spec mini_gas.EffectSpec
+        effect_def = defs.effect_defs[effect_def_or_spec.def_id]
+        if not effect_def then
+            log_mod.warn("apply_effect: effect def not found: " .. tostring(effect_def_or_spec.def_id))
+            return
+        end
+        level = effect_def_or_spec.level or level or 1
+        stack = effect_def_or_spec.stack or stack or 1
+    else
+        ---@cast effect_def_or_spec mini_gas.EffectDef
+        effect_def = effect_def_or_spec
+        level = level or 1
+        stack = stack or 1
+    end
+
+    local key = effect_key(effect_def.id)
+    defs.effect_defs[effect_def.id] = effect_def
 
     if state.effects[key] then
         local existing = state.effects[key]
-        local policy = spec.stacking or enum.EStackingPolicy.None
+        local policy = effect_def.stacking or enum.EStackingPolicy.None
         if policy == enum.EStackingPolicy.Add then
-            local max_stack = spec.max_stack or math.huge
+            local max_stack = effect_def.max_stack or math.huge
             existing.stack = math.min(existing.stack + stack, max_stack)
             for _, mod in ipairs(existing.modifiers) do
                 mod.stack = existing.stack
             end
-            existing.remaining = resolve(spec.duration, existing)
-            event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = spec.id, stack = existing.stack })
+            existing.remaining = resolve(effect_def.duration, existing)
+            event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id, stack = existing.stack })
             return
         elseif policy == enum.EStackingPolicy.Refresh then
-            existing.remaining = resolve(spec.duration, existing)
+            existing.remaining = resolve(effect_def.duration, existing)
             existing.stack = math.max(existing.stack, stack)
             existing.level = level
             for _, mod in ipairs(existing.modifiers) do
                 mod.stack = existing.stack
                 mod.level = existing.level
             end
-            event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = spec.id, refreshed = true })
+            event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id, refreshed = true })
             return
         else
-            M.remove_effect(state, spec.id)
+            M.remove_effect(state, effect_def.id)
         end
     end
 
-    local effect = effect_mod.GameplayEffect.new(spec, level, stack)
+    local effect = effect_mod.GameplayEffect.new(effect_def, level, stack)
     if effect.duration_policy == enum.EDurationPolicy.HasDuration then
-        effect.remaining = resolve(spec.duration, effect)
+        effect.remaining = resolve(effect_def.duration, effect)
     end
 
     if effect.duration_policy == enum.EDurationPolicy.Instant then
         if effect_mod.meets_tag_requirements(state, effect) then
             apply_instant_modifiers(state, defs, effect)
         end
-        event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = spec.id })
+        event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id })
         return
     end
 
@@ -531,7 +571,7 @@ function M.apply_effect(state, defs, spec, level, stack)
     end
 
     state.effects[key] = effect
-    event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = spec.id })
+    event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id })
 end
 
 ---移除效果

@@ -53,6 +53,7 @@ function M.GameplayAbility.new(spec, level, stack)
         is_active = false,
         cooldown_remaining = 0,
         listener = nil,
+        spawned_effects = {},
     }
 end
 
@@ -112,8 +113,13 @@ end
 
 ---激活技能
 ---@param ability mini_gas.GameplayAbility
+---@return boolean ok
 function M.activate(ability)
+    if ability.is_active then
+        return false
+    end
     ability.is_active = true
+    return true
 end
 
 ---结束技能

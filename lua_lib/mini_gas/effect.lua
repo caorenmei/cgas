@@ -1,5 +1,6 @@
 --- GameplayEffect 运行时实例
 --- 实例为自包含普通 Lua 表，不引用外部 Def。
+local enum = require("mini_gas.enum")
 local modifier_mod = require("mini_gas.modifier")
 local tag_mod = require("mini_gas.tag")
 
@@ -16,6 +17,16 @@ local function copy_array(arr)
         result[i] = v
     end
     return result
+end
+
+---根据持续策略初始化剩余时间
+---@param duration_policy mini_gas.EDurationPolicy
+---@return number
+local function initial_remaining(duration_policy)
+    if duration_policy == enum.EDurationPolicy.Instant then
+        return 0
+    end
+    return math.huge
 end
 
 ---@param spec mini_gas.EffectDef
@@ -40,7 +51,7 @@ function M.GameplayEffect.new(spec, level, stack)
         level = level,
         stack = stack,
         elapsed = 0,
-        remaining = math.huge,
+        remaining = initial_remaining(spec.duration_policy),
         last_trigger_count = 0,
         modifiers = {},
     }

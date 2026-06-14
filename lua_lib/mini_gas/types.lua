@@ -107,6 +107,7 @@
 ---@field is_active boolean
 ---@field cooldown_remaining number
 ---@field listener? fun(payload:table?)
+---@field spawned_effects mini_gas.EffectId[]
 
 ---@class mini_gas.GameplayTask
 ---@field kind "delay"|"periodic"|"wait_event"
