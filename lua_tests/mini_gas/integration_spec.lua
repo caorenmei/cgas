@@ -1,5 +1,6 @@
 require("lua_tests.support.env")
 local mini_gas = require("mini_gas")
+local state_mod = require("mini_gas.state")
 local EntityState = mini_gas.EntityState
 local WorldState = mini_gas.WorldState
 local MiniASC = mini_gas.MiniASC
@@ -45,6 +46,9 @@ describe("mini_gas integration", function()
         local function linear(level, base, params)
             return base + (level - 1) * (params and params.growth or 0)
         end
+        local function make_linear(base, growth, level)
+            return linear(level, base, { growth = growth })
+        end
 
         local state = EntityState.new()
 
@@ -76,7 +80,7 @@ describe("mini_gas integration", function()
             duration_policy = EDurationPolicy.Infinite,
             granted_tags = { ETag.Pet_Active },
             modifiers = {
-                { attribute = EAttribute.Attack, op = EModifierOp.Add, value = mini_gas.make_growth_curve(20, { growth = 5 }, linear) },
+                { attribute = EAttribute.Attack, op = EModifierOp.Add, value = make_linear(20, 5, 5) },
             },
         }, 5, 1)
 
@@ -96,7 +100,7 @@ describe("mini_gas integration", function()
             id = EAbilityId.HeroAttack,
             activation_policy = EAbilityActivationPolicy.Active,
             require_tags = { ETag.Pet_Active },
-            forbid_tags = { ETag.State_Silenced },
+            blocked_tags = { ETag.State_Silenced },
             cooldown = 1.5,
             cost = { [EAttribute.Mp] = 10 },
             effects = {
@@ -135,7 +139,7 @@ describe("mini_gas integration", function()
 
         -- WorldState 管理
         local world = WorldState.new()
-        world:register_entity("player", state)
+        state_mod.register_entity(world, "player", state)
 
         MiniASC.update_world(world, 120)
 

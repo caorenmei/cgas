@@ -14,74 +14,67 @@
 mindmap
   root((Spec + Level + Stack))
     AbilitySpec
-      冷却
-      消耗
-      等级成长
-      Stack
+      def_id
+      level
+      stack
     EffectSpec
-      Modifier
-      持续时间
-      周期
-      Stack
+      def_id
+      level
+      stack
     AttributeSpec
-      Base 值
-      等级成长
-      边界
+      def_id
+      level
     GrowthCurve
-      base
-      params
-      formula
+      任意公式函数
 ```
 
 ### 7.2 AbilitySpec
 
 ```lua
 ---@class mini_gas.AbilitySpec
----@field def mini_gas.GameplayAbilityDef
+---@field def_id mini_gas.AbilityId
 ---@field level number
 ---@field stack number
 ```
 
-AbilitySpec 保存一个技能在特定等级与 Stack 下的实例化信息，是对 `def + level + stack` 的结构化封装。`MiniASC.give_ability(state, ...)` 直接接收 `GameplayAbilityDef` 与等级/Stack 参数，内部构造 `GameplayAbility` 写入 `state`。
+AbilitySpec 保存一个技能在特定等级与 Stack 下的实例化信息，是对 `def_id + level + stack` 的结构化封装。`MiniASC.give_ability(state, def, level, stack)` 直接接收 `GameplayAbilityDef` 与等级/Stack 参数，内部构造 `GameplayAbility`（引用 `spec_id = def.id`）写入 `state`。
 
 ### 7.3 EffectSpec
 
 ```lua
 ---@class mini_gas.EffectSpec
----@field def mini_gas.EffectDef
+---@field def_id mini_gas.EffectId
 ---@field level number
 ---@field stack number
 ```
 
-EffectSpec 保存一个效果在特定等级与 Stack 下的实例化信息，是对 `def + level + stack` 的结构化封装。`MiniASC.apply_effect(state, ...)` 直接接收 `EffectDef` 与等级/Stack 参数，内部构造 `GameplayEffect` 写入 `state`。
+EffectSpec 保存一个效果在特定等级与 Stack 下的实例化信息，是对 `def_id + level + stack` 的结构化封装。`MiniASC.apply_effect(state, def, level, stack)` 直接接收 `EffectDef` 与等级/Stack 参数，内部构造 `GameplayEffect`（引用 `spec_id = def.id`）写入 `state`。
 
 ### 7.4 AttributeSpec
 
 ```lua
 ---@class mini_gas.AttributeSpec
----@field def mini_gas.AttributeDef
+---@field def_id mini_gas.AttributeId
 ---@field level number
 ```
 
-AttributeSpec 保存一个属性在特定等级下的 Base 值。当前 `MiniASC.register_attributes(state, defs)` 在注册时按等级 1 初始化 Base；若业务需要在运行时调整属性等级，可直接修改 `state.attributes[attr_id].base` 并派发 `AttributeChanged` 事件。
+AttributeSpec 保存一个属性在特定等级下的值。`MiniASC.register_attributes(state, defs)` 在注册时按等级 1 初始化 `state.attributes`；若业务需要在运行时调整属性等级，可直接修改 `state.attributes[attr_id]` 并派发 `AttributeChanged` 事件。
 
 ### 7.5 GrowthCurve 公式
 
-`GrowthCurve` **只能通过公式计算**，不支持等级查表。业务方提供任意 `GrowthFormula`，框架在需要时调用：
+`GrowthCurve` 是任意公式函数，不强制 `base` / `params` 字段，也不限定仅按等级成长。业务方提供任意函数签名 `fun(level: number, ...): number`，框架在需要时调用：
 
 ```lua
 ---@param level number 当前等级
----@param base number 基础值
----@param params table|nil 公式参数
 ---@return number
-local function linear_growth(level, base, params)
-    return base + (level - 1) * (params and params.growth or 0)
+local function linear_growth(level)
+    return 100 + (level - 1) * 10
 end
 ```
 
-公式可以是线性、指数、对数、分段函数等任何形式，只要符合 `GrowthFormula` 签名即可。策划配置中应描述公式类型与参数，由 `ConfigAdapter` 转换为具体的 `GrowthCurve`。
+公式可以是线性、指数、对数、分段函数等任何形式。策划配置中应描述公式类型与参数，由 `ConfigAdapter` 转换为具体的 `GrowthCurve`。
 
----
+> 注意：`ModifierDef.value` 仅支持 `number` 或 `fun(self: Modifier, v: number): number`（用于 `Compound`）。若 Modifier 需要随等级成长，应在 `apply_effect` / `give_ability` 前由 `ConfigAdapter` 按目标等级生成对应的 `number` 值。
 
 ---
 

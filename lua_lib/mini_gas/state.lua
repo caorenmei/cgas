@@ -1,5 +1,5 @@
 --- EntityState / WorldState
---- 状态表均为无元表的普通 Lua 表，便于序列化与持久化。
+--- 状态表均为无元表的普通 Lua 表。
 local tag_mod = require("mini_gas.tag")
 
 local M = {}
@@ -12,8 +12,11 @@ M.WorldState = {}
 function M.EntityState.new()
     return {
         attributes = {},
+        _attribute_defs = {},
         abilities = {},
+        _ability_defs = {},
         effects = {},
+        _effect_defs = {},
         tags = tag_mod.GameplayTagContainer.new(),
         event_listeners = {},
         tasks = {},
@@ -27,10 +30,15 @@ end
 function M.WorldState.new()
     return {
         entities = {},
-        register_entity = function(self, id, state)
-            self.entities[id] = state
-        end,
     }
+end
+
+---注册实体状态
+---@param world mini_gas.WorldState
+---@param id string
+---@param state mini_gas.EntityState
+function M.register_entity(world, id, state)
+    world.entities[id] = state
 end
 
 return M

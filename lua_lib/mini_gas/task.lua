@@ -54,7 +54,8 @@ end
 ---@param task mini_gas.GameplayTask
 function M.register_task(state, task)
     state.tasks = state.tasks or {}
-    table.insert(state.tasks, task)
+    local tasks = state.tasks
+    tasks[#tasks + 1] = task
     if task.kind == "wait_event" and task.event then
         local wrapper
         wrapper = function(payload)

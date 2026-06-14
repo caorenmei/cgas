@@ -1,5 +1,6 @@
 require("lua_tests.support.env")
 local mini_gas = require("mini_gas")
+local state_mod = require("mini_gas.state")
 local EntityState = mini_gas.EntityState
 local WorldState = mini_gas.WorldState
 local MiniASC = mini_gas.MiniASC
@@ -109,8 +110,8 @@ describe("mini_gas asc", function()
             period = 1,
             modifiers = { { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 2 } },
         }, 1, 1)
-        world:register_entity("s1", state1)
-        world:register_entity("s2", state2)
+        state_mod.register_entity(world, "s1", state1)
+        state_mod.register_entity(world, "s2", state2)
 
         MiniASC.update_world(world, 3)
         assert.equal(3, MiniASC.get_current(state1, EAttribute.Gold))

@@ -95,14 +95,24 @@ mindmap
       EntityState
       WorldState
       GameplayAbility
+      GameplayAbilityDef
       GameplayEffect
+      EffectDef
       Modifier
-      Attribute
-      GameplayTag
+      ModifierDef
+      AttributeDef
       GameplayTagContainer
+      GameplayTask
+      AbilitySpec
+      EffectSpec
+      AttributeSpec
       GrowthCurve
     idAlias["@alias"]
-      GrowthFormula
+      TagId
+      AttributeId
+      AbilityId
+      EffectId
+      GameplayEventId
       ConfigAdapter
 ```
 

@@ -1,20 +1,14 @@
 require("lua_tests.support.env")
-local mini_gas = require("mini_gas")
 local tag_mod = require("mini_gas.tag")
-local GameplayTag = mini_gas.GameplayTag
-local GameplayTagContainer = mini_gas.GameplayTagContainer
+local GameplayTagContainer = require("mini_gas.tag").GameplayTagContainer
 
 describe("mini_gas tag", function()
     it("matches exact and parent tags", function()
-        local t1 = GameplayTag.new("state.dead")
-        local t2 = GameplayTag.new("state.dead")
-        local t3 = GameplayTag.new("state")
-        local t4 = GameplayTag.new("state.stunned")
-
-        assert.is_true(tag_mod.matches(t1, t2))
-        assert.is_true(tag_mod.matches(t1, t3))
-        assert.is_true(tag_mod.matches(t3, t1))
-        assert.is_false(tag_mod.matches(t1, t4))
+        assert.is_true(tag_mod.matches("state.dead", "state.dead"))
+        assert.is_true(tag_mod.matches("state.dead", "state"))
+        assert.is_true(tag_mod.matches("state", "state.dead"))
+        assert.is_false(tag_mod.matches("state.dead", "state.stunned"))
+        assert.is_false(tag_mod.matches("state.dead", "state.deadly"))
     end)
 
     it("container supports add/remove/has", function()

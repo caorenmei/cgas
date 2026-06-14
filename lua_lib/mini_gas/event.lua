@@ -1,4 +1,6 @@
 --- GameplayEvent 派发与监听
+local log_mod = require("mini_gas.log")
+
 local M = {}
 
 ---派发事件
@@ -18,7 +20,7 @@ function M.dispatch_event(state, event, payload)
     for _, fn in ipairs(copy) do
         local ok, err = pcall(fn, payload)
         if not ok then
-            io.stderr:write("[mini_gas.event] listener error: " .. tostring(err) .. "\n")
+            log_mod.warn("[mini_gas.event] listener error: " .. tostring(err))
         end
     end
 end
@@ -28,8 +30,9 @@ end
 ---@param event mini_gas.GameplayEventId
 ---@param listener fun(payload:table|nil)
 function M.listen_event(state, event, listener)
-    state.event_listeners[event] = state.event_listeners[event] or {}
-    table.insert(state.event_listeners[event], listener)
+    local listeners = state.event_listeners[event] or {}
+    listeners[#listeners + 1] = listener
+    state.event_listeners[event] = listeners
 end
 
 ---移除事件监听

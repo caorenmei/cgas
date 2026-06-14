@@ -1,63 +1,51 @@
 --- Spec 基础结构与成长曲线
---- 配置类对象均为无元表的普通 Lua 表，便于序列化与外部配置桥接。
+--- 配置类对象均为无元表的普通 Lua 表。
 local M = {}
 
 M.AbilitySpec = {}
 M.EffectSpec = {}
 M.AttributeSpec = {}
 
----创建成长曲线（纯 Lua 表）
----@param base number
----@param params table|nil 公式参数
----@param formula mini_gas.GrowthFormula|nil
+---创建成长曲线（返回公式函数本身）
+---@param formula mini_gas.GrowthCurve
 ---@return mini_gas.GrowthCurve
-function M.make_growth_curve(base, params, formula)
-    return {
-        base = base,
-        params = params,
-        formula = formula or function(_, b, _)
-            return b
-        end,
-        value_at = function(self, level)
-            level = level or 1
-            return self.formula(level, self.base, self.params)
-        end,
-    }
+function M.make_growth_curve(formula)
+    return formula
 end
 
----创建 AbilitySpec（纯 Lua 表）
----@param def mini_gas.GameplayAbilityDef
+---创建 AbilitySpec
+---@param def_id mini_gas.AbilityId
 ---@param level number
 ---@param stack number
 ---@return mini_gas.AbilitySpec
-function M.AbilitySpec.new(def, level, stack)
+function M.AbilitySpec.new(def_id, level, stack)
     return {
-        def = def,
+        def_id = def_id,
         level = level or 1,
         stack = stack or 1,
     }
 end
 
----创建 EffectSpec（纯 Lua 表）
----@param def mini_gas.EffectDef
+---创建 EffectSpec
+---@param def_id mini_gas.EffectId
 ---@param level number
 ---@param stack number
 ---@return mini_gas.EffectSpec
-function M.EffectSpec.new(def, level, stack)
+function M.EffectSpec.new(def_id, level, stack)
     return {
-        def = def,
+        def_id = def_id,
         level = level or 1,
         stack = stack or 1,
     }
 end
 
----创建 AttributeSpec（纯 Lua 表）
----@param def mini_gas.AttributeDef
+---创建 AttributeSpec
+---@param def_id mini_gas.AttributeId
 ---@param level number
 ---@return mini_gas.AttributeSpec
-function M.AttributeSpec.new(def, level)
+function M.AttributeSpec.new(def_id, level)
     return {
-        def = def,
+        def_id = def_id,
         level = level or 1,
     }
 end

@@ -60,9 +60,9 @@ local effect_by_alias = {
 通用线性成长公式：
 
 ```lua
----@type mini_gas.GrowthFormula
-local function linear_growth(level, base, params)
-    return base + (level - 1) * (params and params.growth or 0)
+---@type mini_gas.GrowthCurve
+local function linear_growth(level, base, growth)
+    return base + (level - 1) * (growth or 0)
 end
 ```
 
@@ -70,22 +70,24 @@ end
 
 ```lua
 ---@param json_cfg table
+---@param level? number
 ---@return mini_gas.EffectDef
-local function effect_adapter(json_cfg)
+local function effect_adapter(json_cfg, level)
+    level = level or 1
     local modifiers = {}
     for _, m in ipairs(json_cfg.modifiers) do
-        table.insert(modifiers, {
+        modifiers[#modifiers + 1] = {
             attribute = attr_by_alias[m.attribute], -- 通过策划 alias 映射到项目枚举
             op = mini_gas.EModifierOp[m.op],
-            value = mini_gas.make_growth_curve(m.value, { growth = m.growth }, linear_growth),
-        })
+            value = linear_growth(level, m.value, m.growth),
+        }
     end
 
     return {
         id = effect_by_alias[json_cfg.id],
         alias = json_cfg.alias,
         duration_policy = mini_gas.EDurationPolicy[json_cfg.duration_policy],
-        duration = mini_gas.make_growth_curve(json_cfg.duration, { growth = json_cfg.duration_growth }, linear_growth),
+        duration = linear_growth(level, json_cfg.duration, json_cfg.duration_growth),
         modifiers = modifiers,
     }
 end
@@ -99,7 +101,7 @@ MiniASC.register_attributes(state, {
     { name = EAttribute.Attack, base = 100 },
 })
 
-local effect_def = effect_adapter(json.decode(effect_config_text))
+local effect_def = effect_adapter(json.decode(effect_config_text), 3)
 MiniASC.apply_effect(state, effect_def, 3, 1) -- 3 级时 value = 50 + (3-1)*10 = 70
 
 -- state 为纯 Lua 表，可直接序列化

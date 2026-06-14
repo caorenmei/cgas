@@ -5,18 +5,18 @@
 lua_lib/
 └── mini_gas/                      -- 独立目录
     ├── init.lua                   -- 模块入口，导出所有公共 API
-    ├── types.lua                  -- LuaCATS 类型定义集中文件
-    ├── state.lua                  -- EntityState / WorldState
+    ├── types.lua                  -- LuaCATS 类型定义集中文件（不含枚举）
+    ├── state.lua                  -- EntityState / WorldState / register_entity
     ├── asc.lua                    -- MiniASC 无状态函数集合
-    ├── ability.lua                -- GameplayAbility 与 AbilitySpec
-    ├── effect.lua                 -- GameplayEffect 与 EffectSpec
+    ├── ability.lua                -- GameplayAbility 运行时实例
+    ├── effect.lua                 -- GameplayEffect 运行时实例
     ├── modifier.lua               -- Modifier 聚合逻辑
-    ├── attribute.lua              -- Attribute 与 AttributeSet
-    ├── tag.lua                    -- GameplayTag 与 GameplayTagContainer
+    ├── attribute.lua              -- Attribute 数值工具函数（clamp / calc_base）
+    ├── tag.lua                    -- GameplayTagContainer 与标签匹配
     ├── event.lua                  -- GameplayEvent 派发与监听
     ├── task.lua                   -- GameplayTask 轻量异步任务
-    ├── spec.lua                   -- Spec 基础结构与 GrowthCurve
-    └── enum.lua                   -- 所有枚举常量定义
+    ├── spec.lua                   -- Spec 构造器与 GrowthCurve
+    └── enum.lua                   -- 所有枚举常量定义（@enum）
 ```
 
 > `mini-gas` 为自包含实现，所有代码均在 `lua_lib/mini_gas/` 内，不依赖任何外部 GAS 库。
@@ -42,7 +42,7 @@ local mini_gas = require("mini_gas")
 | 方法 | 说明 |
 |------|------|
 | `WorldState.new()` | 创建新的世界状态（`table<EntityId, EntityState>`） |
-| `world.register_entity(world, id, state)` | 注册实体状态（plain table 内嵌函数） |
+| `mini_gas.register_entity(world, id, state)` | 注册实体状态到 WorldState（工具函数） |
 
 ### 10.4 MiniASC
 
@@ -74,6 +74,10 @@ local mini_gas = require("mini_gas")
 ### 10.5 工具函数
 
 ```lua
+---注入日志句柄（省略或传 nil 时关闭日志）
+---@param logger { warn: fun(msg: string) }|nil
+function mini_gas.set_logger(logger) end
+
 ---将原始配置批量转换为 EffectDef
 ---@param raw_configs any[]
 ---@param adapter mini_gas.ConfigAdapter
@@ -88,17 +92,15 @@ function mini_gas.adapt_abilities(raw_configs, adapter) end
 
 ---计算单个属性的 Current 值（无状态纯函数）
 ---@param base number
+---@param entity_state mini_gas.EntityState
 ---@param modifiers mini_gas.Modifier[]
----@param container mini_gas.GameplayTagContainer|nil 用于 Modifier 标签约束判断
 ---@return number
-function mini_gas.calc_attribute(base, modifiers, container) end
+function mini_gas.calc_attribute(base, entity_state, modifiers) end
 
----创建成长曲线
----@param base number
----@param params table|nil 公式参数
----@param formula mini_gas.GrowthFormula|nil 省略时返回 base
+---创建成长曲线（返回公式函数本身）
+---@param formula mini_gas.GrowthCurve
 ---@return mini_gas.GrowthCurve
-function mini_gas.make_growth_curve(base, params, formula) end
+function mini_gas.make_growth_curve(formula) end
 ```
 
 ---

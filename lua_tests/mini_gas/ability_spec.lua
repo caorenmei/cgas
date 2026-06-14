@@ -69,7 +69,7 @@ describe("mini_gas ability", function()
             cooldown = 5,
             cost = { [EAttribute.Mp] = 20 },
             require_tags = {},
-            forbid_tags = {},
+            blocked_tags = {},
             effects = {
                 {
                     id = EEffectId.FireballDamage,
@@ -107,7 +107,7 @@ describe("mini_gas ability", function()
             cooldown = 0,
             cost = { [EAttribute.Mp] = 10 },
             require_tags = { ETag.Combat },
-            forbid_tags = { ETag.Stunned },
+            blocked_tags = { ETag.Stunned },
             effects = {},
         }, 1, 1)
 

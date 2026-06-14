@@ -30,7 +30,9 @@ describe("mini_gas attribute", function()
             return base + (level - 1) * (params and params.growth or 0)
         end
         MiniASC.register_attributes(state, {
-            { name = EAttribute.Attack, base = 100, growth = mini_gas.make_growth_curve(100, { growth = 10 }, linear) },
+            { name = EAttribute.Attack, base = 100, growth = mini_gas.make_growth_curve(function(level)
+                return linear(level, 100, { growth = 10 })
+            end) },
         })
 
         assert.equal(100, MiniASC.get_base(state, EAttribute.Attack))

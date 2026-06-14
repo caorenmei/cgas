@@ -89,7 +89,7 @@ local EAttribute = {
 }
 
 -- 线性成长公式：value = base + (level - 1) * params.growth
----@type mini_gas.GrowthFormula
+---@type mini_gas.GrowthCurve
 local function linear(level, base, params)
     return base + (level - 1) * (params and params.growth or 0)
 end
@@ -97,9 +97,9 @@ end
 local fireball_def = {
     id = EAbilityId.Fireball,
     activation_policy = EAbilityActivationPolicy.Active,
-    cooldown = mini_gas.make_growth_curve(5, { growth = -0.2 }, linear), -- 每级冷却减少 0.2 秒
+    cooldown = mini_gas.make_growth_curve(function(level) return linear(level, 5, { growth = -0.2 }) end), -- 每级冷却减少 0.2 秒
     cost = {
-        [EAttribute.Mp] = mini_gas.make_growth_curve(20, { growth = 2 }, linear),
+        [EAttribute.Mp] = mini_gas.make_growth_curve(function(level) return linear(level, 20, { growth = 2 }) end),
     },
     effects = {
         {
@@ -109,7 +109,7 @@ local fireball_def = {
                 {
                     attribute = EAttribute.Hp,
                     op = EModifierOp.Add,
-                    value = mini_gas.make_growth_curve(-100, { growth = -15 }, linear), -- 每级伤害增加 15
+                    value = linear(3, -100, { growth = -15 }), -- 3 级时 -130
                 },
             },
         },
@@ -211,7 +211,7 @@ local counter_attack_def = {
     activation_policy = EAbilityActivationPolicy.Reactive,
     activation_event = EGameplayEvent.DamageTaken,
     require_tags = { ETag.State_Combat },
-    forbid_tags = { ETag.State_Stunned },
+    blocked_tags = { ETag.State_Stunned },
     cooldown = 3,
     effects = {
         {
@@ -271,7 +271,7 @@ local total_iron = MiniASC.get_current(city_state, EAttribute.IronOutput)
 
 - **装备**：永久加成攻击与防御。
 - **宠物**：按等级公式永久加成攻击，并 **Granted** `pet.active` 标签。
-- **英雄技能**：通过 `require_tags = {pet.active}` 只有携带宠物时才能激活；通过 `forbid_tags = {state.silenced}` 被沉默时无法使用。
+- **英雄技能**：通过 `require_tags = {pet.active}` 只有携带宠物时才能激活；通过 `blocked_tags = {state.silenced}` 被沉默时无法使用。
 - **VIP 特权**：**Granted** `buff.vip` 标签，并提升金币/经验倍率；建筑产出的额外倍率 Modifier 通过 `require_tags = {buff.vip}` 启用。
 - **主城建筑**：周期性产出金币与铁矿，产出倍率受 VIP 标签驱动。
 - **WorldState**：将共享的 `EntityState` 注册为 `"player"`，通过 `MiniASC.update_world` 统一推进所有实体。
@@ -323,7 +323,7 @@ local EEffectId = {
 }
 
 -- 线性成长公式
----@type mini_gas.GrowthFormula
+---@type mini_gas.GrowthCurve
 local function linear(level, base, params)
     return base + (level - 1) * (params and params.growth or 0)
 end
@@ -359,7 +359,7 @@ MiniASC.apply_effect(state, {
     duration_policy = EDurationPolicy.Infinite,
     granted_tags = { ETag.Pet_Active },
     modifiers = {
-        { attribute = EAttribute.Attack, op = EModifierOp.Add, value = mini_gas.make_growth_curve(20, { growth = 5 }, linear) },
+        { attribute = EAttribute.Attack, op = EModifierOp.Add, value = linear(5, 20, { growth = 5 }) }, -- 5 级时 40
     },
 }, 5, 1) -- 5 级：20 + (5-1)*5 = 40
 
@@ -375,12 +375,12 @@ MiniASC.apply_effect(state, {
 }, 1, 1)
 
 -- 主动技能：普通攻击
--- Require Tags：必须携带宠物；Forbid Tags：沉默时无法使用
+-- Require Tags：必须携带宠物；Blocked Tags：沉默时无法使用
 local hero_attack_def = {
     id = EAbilityId.HeroAttack,
     activation_policy = EAbilityActivationPolicy.Active,
     require_tags = { ETag.Pet_Active },
-    forbid_tags = { ETag.State_Silenced },
+    blocked_tags = { ETag.State_Silenced },
     cooldown = 1.5,
     cost = { [EAttribute.Mp] = 10 },
     effects = {
@@ -421,7 +421,7 @@ MiniASC.apply_effect(state, {
 
 -- 使用 WorldState 管理实体（本质是 table<EntityId, EntityState>）
 local world = WorldState.new()
-world.register_entity(world, "player", state)
+mini_gas.register_entity(world, "player", state)
 
 -- 模拟 120 秒的游戏时间：统一更新整个世界
 MiniASC.update_world(world, 120)

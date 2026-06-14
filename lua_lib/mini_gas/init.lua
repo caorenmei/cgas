@@ -3,13 +3,13 @@
 local enum = require("mini_gas.enum")
 local spec = require("mini_gas.spec")
 local tag = require("mini_gas.tag")
-local attribute = require("mini_gas.attribute")
 local modifier = require("mini_gas.modifier")
 local effect = require("mini_gas.effect")
 local ability = require("mini_gas.ability")
 local task = require("mini_gas.task")
 local state = require("mini_gas.state")
 local asc = require("mini_gas.asc")
+local log_mod = require("mini_gas.log")
 
 local M = {}
 
@@ -28,17 +28,21 @@ M.EGameplayEvent = enum.EGameplayEvent
 M.AbilitySpec = spec.AbilitySpec
 M.EffectSpec = spec.EffectSpec
 M.AttributeSpec = spec.AttributeSpec
-M.GameplayTag = tag.GameplayTag
 M.GameplayTagContainer = tag.GameplayTagContainer
-M.Attribute = attribute.Attribute
-M.AttributeSet = attribute.AttributeSet
 M.Modifier = modifier.Modifier
 M.GameplayEffect = effect.GameplayEffect
 M.GameplayAbility = ability.GameplayAbility
 M.GameplayTask = task.GameplayTask
 M.EntityState = state.EntityState
 M.WorldState = state.WorldState
+M.register_entity = state.register_entity
 M.MiniASC = asc
+
+---注入日志句柄
+---@param logger { warn: fun(msg: string) }|nil
+function M.set_logger(logger)
+    log_mod.set_logger(logger)
+end
 
 ---将原始配置批量转换为 EffectDef
 ---@param raw_configs any[]
@@ -47,7 +51,7 @@ M.MiniASC = asc
 function M.adapt_effects(raw_configs, adapter)
     local result = {}
     for _, raw in ipairs(raw_configs or {}) do
-        table.insert(result, adapter(raw))
+        result[#result + 1] = adapter(raw)
     end
     return result
 end
@@ -59,27 +63,25 @@ end
 function M.adapt_abilities(raw_configs, adapter)
     local result = {}
     for _, raw in ipairs(raw_configs or {}) do
-        table.insert(result, adapter(raw))
+        result[#result + 1] = adapter(raw)
     end
     return result
 end
 
 ---计算单个属性的 Current 值（无状态纯函数）
 ---@param base number
+---@param entity_state mini_gas.EntityState
 ---@param modifiers mini_gas.Modifier[]
----@param container mini_gas.GameplayTagContainer|nil
 ---@return number
-function M.calc_attribute(base, modifiers, container)
-    return modifier.calc_attribute(base, modifiers, container)
+function M.calc_attribute(base, entity_state, modifiers)
+    return modifier.calc_attribute(base, entity_state, modifiers)
 end
 
 ---创建成长曲线
----@param base number
----@param params table|nil
----@param formula mini_gas.GrowthFormula|nil
+---@param formula mini_gas.GrowthCurve
 ---@return mini_gas.GrowthCurve
-function M.make_growth_curve(base, params, formula)
-    return spec.make_growth_curve(base, params, formula)
+function M.make_growth_curve(formula)
+    return spec.make_growth_curve(formula)
 end
 
 return M
