@@ -39,7 +39,7 @@ cgas/
   - worktree 目录统一放在 `.worktrees/` 下。
 
 - **TDD**：新功能、Bug 修复、重构均遵循红-绿-重构循环。先写失败的测试，再写最小实现使其通过，最后重构。
-- **静态诊断**：提交前运行 `lua-language-server --check . --configpath .luarc.json`，确保无诊断问题。
+- **静态诊断**：提交前运行 `lua-language-server --check . --configpath .luarc.json`，要求输出 `Diagnosis completed, no problems found`，即零错误、零警告。任何 `Error` 或 `Warning` 都必须修复后才能提交。
 
 ## 测试环境
 
