@@ -60,8 +60,8 @@ local mini_gas = require("mini_gas")
 | `MiniASC.remove_ability(state, defs, ability_id)` | 移除技能 |
 | `MiniASC.set_ability_stack(state, ability_id, stack)` | 设置技能 Stack |
 | `MiniASC.try_activate_ability(state, defs, ability_id, payload?)` | 尝试激活技能 |
-| `MiniASC.apply_effect(state, defs, effect_def, stack?)` | 应用效果 |
-| `MiniASC.remove_effect(state, defs, effect_id)` | 移除效果 |
+| `MiniASC.apply_effect(state, defs, effect_def, stack?)` | 应用效果；返回运行时实例 ID（Instant 效果返回 `nil`） |
+| `MiniASC.remove_effect(state, defs, effect_id)` | 按配置 ID 移除效果 |
 | `MiniASC.set_effect_stack(state, effect_id, stack)` | 设置效果 Stack |
 | `MiniASC.add_tag(state, tag)` | 添加标签 |
 | `MiniASC.remove_tag(state, tag)` | 移除标签 |

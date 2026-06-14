@@ -13,7 +13,7 @@
 - `EffectDef.duration` / `EffectDef.period`：`fun(self: GameplayEffect): number`
 - `ModifierDef.value`（Compound）：`fun(self: Modifier, v: number): number`
 
-运行时实例不持有 `def` 引用；需要 Def 数据时通过 `defs.ability_defs[self.id]`、`defs.effect_defs[self.id]` 或 `defs.effect_defs[mod.effect_id].modifiers[mod.index]` 查找。基类不预定义 `level`，避免把成长模型硬编码进框架。
+运行时实例不持有 `def` 引用；需要 Def 数据时通过 `defs.ability_defs[self.def_id]`、`defs.effect_defs[self.def_id]` 或 `defs.effect_defs[mod.def_id].modifiers[mod.index]` 查找。基类不预定义 `level`，避免把成长模型硬编码进框架。
 
 ### 3.3 无魔术字符串
 
@@ -32,7 +32,7 @@
 
 ### 3.4 运行时状态轻量、Def 外置
 
-`mini-gas` 的运行时状态对象（`EntityState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask`）均为无元表的普通 Lua 表。`GameplayAbility` / `GameplayEffect` 的运行时实例仅保留 `id` 与运行时字段；`Modifier` 的运行时实例仅保留 `effect_id`、`index` 与 `stack`。它们均不引用外部 Def，也不复制配置字段；需要 `require_tags`、数值公式等字段时，通过传入的 `defs` 查找。
+`mini-gas` 的运行时状态对象（`EntityState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask`）均为无元表的普通 Lua 表。`GameplayAbility` / `GameplayEffect` 的运行时实例保留运行时生成的唯一 `id`（实例 ID）、`def_id`（配置 ID）与运行时字段；`Modifier` 的运行时实例仅保留 `def_id`（所属 Effect 的配置 ID）、`index` 与 `stack`，并被包含于 `GameplayEffect.modifiers` 中。它们均不引用外部 Def，也不复制配置字段；需要 `require_tags`、数值公式等字段时，通过传入的 `defs` 查找。
 
 配置定义集中存放在 `Defs` 表中，由调用方持有，并在需要的 API 调用中传入。若业务需要完全自包含的快照，可在序列化前将 Def 数据合并到实例中。
 

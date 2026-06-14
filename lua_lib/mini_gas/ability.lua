@@ -1,10 +1,20 @@
 --- GameplayAbility 运行时实例
---- 实例为轻量运行时状态表，仅保留 id 与运行时字段，配置通过 defs 查找。
+--- 实例包含运行时生成的唯一 id 与 def_id，不直接持有 Def 引用。
 local tag_mod = require("mini_gas.tag")
 
 local M = {}
 
 M.GameplayAbility = {}
+
+local next_instance_id = 1
+
+---生成运行时实例唯一 ID
+---@return integer
+local function generate_instance_id()
+    local id = next_instance_id
+    next_instance_id = id + 1
+    return id
+end
 
 ---解析数值（常量或公式函数）
 ---@param value number | fun(self: mini_gas.GameplayAbility, ...): number
@@ -24,9 +34,10 @@ end
 ---@param stack number|nil
 ---@return mini_gas.GameplayAbility
 function M.GameplayAbility.new(def, stack)
-    ---运行时实例仅保留 id 与状态字段，不持有 Def 引用
+    ---运行时实例保留实例 id、def_id 与状态字段，不持有 Def 引用
     return {
-        id = def.id,
+        id = generate_instance_id(),
+        def_id = def.id,
         stack = stack or def.stack or 1,
         is_active = false,
         cooldown_remaining = 0,
@@ -49,7 +60,7 @@ function M.can_activate(state, defs, ability, payload)
         return false
     end
 
-    local def = defs.ability_defs[ability.id]
+    local def = defs.ability_defs[ability.def_id]
     if not def then
         return false
     end
@@ -97,7 +108,7 @@ end
 ---@param defs mini_gas.Defs
 function M.end_ability(ability, defs)
     ability.is_active = false
-    local def = defs.ability_defs[ability.id]
+    local def = defs.ability_defs[ability.def_id]
     ability.cooldown_remaining = resolve_value(def and def.cooldown or 0, ability)
 end
 

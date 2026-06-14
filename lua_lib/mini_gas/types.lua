@@ -32,8 +32,8 @@
 ---@field blocked_tags? mini_gas.TagId[]
 
 ---@class mini_gas.Modifier
----运行时实例仅保留 effect_id、index 与 stack，配置通过 defs 查找
----@field effect_id mini_gas.EffectId
+---运行时实例仅保留 def_id、index 与 stack，配置通过 defs 查找
+---@field def_id mini_gas.EffectId
 ---@field index integer
 ---@field stack number
 
@@ -52,12 +52,15 @@
 ---@field source any
 
 ---@class mini_gas.GameplayEffect
----运行时实例仅保留 id 与运行时字段，配置通过 defs 查找
----@field id mini_gas.EffectId
+---运行时实例保留实例 id、def_id 与运行时字段，配置通过 defs 查找；
+---包含的 Modifier 数组在创建时生成。
+---@field id integer 运行时实例唯一 ID
+---@field def_id mini_gas.EffectId 配置 ID
 ---@field stack number
 ---@field elapsed number
 ---@field remaining number
 ---@field last_trigger_count number
+---@field modifiers mini_gas.Modifier[]
 
 ---@class mini_gas.GameplayAbilityDef
 ---@field id mini_gas.AbilityId
@@ -74,13 +77,14 @@
 ---@field source any
 
 ---@class mini_gas.GameplayAbility
----运行时实例仅保留 id 与运行时字段，配置通过 defs 查找
----@field id mini_gas.AbilityId
+---运行时实例保留实例 id、def_id 与运行时字段，配置通过 defs 查找
+---@field id integer 运行时实例唯一 ID
+---@field def_id mini_gas.AbilityId 配置 ID
 ---@field stack number
 ---@field is_active boolean
 ---@field cooldown_remaining number
 ---@field listener? fun(payload:table?)
----@field spawned_effects mini_gas.EffectId[]
+---@field spawned_effects integer[] 产生的 Effect 实例 ID 列表
 
 ---@class mini_gas.GameplayTask
 ---@field kind "delay"|"periodic"|"wait_event"

@@ -112,12 +112,10 @@ local function collect_modifiers(state, defs, attr_id)
     local mods = {}
     for _, effect in pairs(state.effects) do
         if effect_mod.meets_tag_requirements(state, defs, effect) and effect_mod.period_value(effect, defs) <= 0 then
-            local effect_def = defs.effect_defs[effect.id]
-            if effect_def then
-                for i, mod_def in ipairs(effect_def.modifiers or {}) do
-                    if mod_def.attribute == attr_id then
-                        mods[#mods + 1] = modifier_mod.Modifier.new(effect.id, i, effect.stack)
-                    end
+            for _, mod in ipairs(effect.modifiers or {}) do
+                local mod_def = modifier_mod.def(defs, mod)
+                if mod_def and mod_def.attribute == attr_id then
+                    mods[#mods + 1] = mod
                 end
             end
         end
@@ -270,7 +268,7 @@ function M.remove_ability(state, defs, ability_id)
         M.end_ability(state, defs, ability_id)
     end
 
-    local ability_def = defs.ability_defs[ability.id]
+    local ability_def = defs.ability_defs[ability.def_id]
     if ability_def and ability_def.activation_policy == enum.EAbilityActivationPolicy.Reactive and ability_def.activation_event then
         local listener = ability.listener
         if listener then
@@ -284,8 +282,8 @@ function M.remove_ability(state, defs, ability_id)
     end
 
     -- 仅移除本技能在激活时产生的效果，避免误删业务方独立应用且 source 相同的效果
-    for _, effect_id in ipairs(ability.spawned_effects or {}) do
-        M.remove_effect(state, defs, effect_id)
+    for _, effect_instance_id in ipairs(ability.spawned_effects or {}) do
+        M.remove_effect_by_instance_id(state, defs, effect_instance_id)
     end
 
     state.abilities[key] = nil
@@ -340,7 +338,7 @@ function M.try_activate_ability(state, defs, ability_id, payload)
         return false
     end
 
-    local ability_def = defs.ability_defs[ability.id]
+    local ability_def = defs.ability_defs[ability.def_id]
     if not ability_def then
         return false
     end
@@ -361,8 +359,10 @@ function M.try_activate_ability(state, defs, ability_id, payload)
             cloned[k] = v
         end
         cloned.source = ability_id
-        M.apply_effect(state, defs, cloned, ability.stack)
-        table.insert(ability.spawned_effects, cloned.id)
+        local effect_instance_id = M.apply_effect(state, defs, cloned, ability.stack)
+        if effect_instance_id then
+            table.insert(ability.spawned_effects, effect_instance_id)
+        end
     end
 
     event_mod.dispatch_event(state, enum.EGameplayEvent.AbilityActivated, {
@@ -382,13 +382,12 @@ end
 ---@param defs mini_gas.Defs
 ---@param effect mini_gas.GameplayEffect
 local function apply_instant_modifiers(state, defs, effect)
-    local effect_def = defs.effect_defs[effect.id]
-    if not effect_def then
-        return
-    end
-    for i, mod_def in ipairs(effect_def.modifiers or {}) do
-        local mod = modifier_mod.Modifier.new(effect.id, i, effect.stack)
+    for _, mod in ipairs(effect.modifiers or {}) do
         if not modifier_mod.is_active(state, defs, mod) then
+            goto continue
+        end
+        local mod_def = modifier_mod.def(defs, mod)
+        if not mod_def then
             goto continue
         end
         local attr_id = mod_def.attribute
@@ -438,17 +437,15 @@ end
 ---@param effect mini_gas.GameplayEffect
 ---@param count number
 local function apply_periodic_modifiers(state, defs, effect, count)
-    local effect_def = defs.effect_defs[effect.id]
-    if not effect_def then
-        return
-    end
-
     local groups = {}
-    for i, mod_def in ipairs(effect_def.modifiers or {}) do
-        local id = mod_def.attribute
-        groups[id] = groups[id] or {}
-        local g = groups[id]
-        g[#g + 1] = modifier_mod.Modifier.new(effect.id, i, effect.stack)
+    for _, mod in ipairs(effect.modifiers or {}) do
+        local mod_def = modifier_mod.def(defs, mod)
+        if mod_def then
+            local id = mod_def.attribute
+            groups[id] = groups[id] or {}
+            local g = groups[id]
+            g[#g + 1] = mod
+        end
     end
 
     for _ = 1, count do
@@ -475,6 +472,7 @@ end
 ---@param defs mini_gas.Defs
 ---@param effect_def mini_gas.EffectDef
 ---@param stack number?
+---@return integer|nil effect_instance_id
 function M.apply_effect(state, defs, effect_def, stack)
     stack = stack or 1
     local key = effect_key(effect_def.id)
@@ -486,13 +484,19 @@ function M.apply_effect(state, defs, effect_def, stack)
         if policy == enum.EStackingPolicy.Add then
             local max_stack = effect_def.max_stack or math.huge
             existing.stack = math.min(existing.stack + stack, max_stack)
+            for _, mod in ipairs(existing.modifiers or {}) do
+                mod.stack = existing.stack
+            end
             event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id, stack = existing.stack })
-            return
+            return existing.id
         elseif policy == enum.EStackingPolicy.Refresh then
             existing.remaining = resolve(effect_def.duration, existing)
             existing.stack = math.max(existing.stack, stack)
+            for _, mod in ipairs(existing.modifiers or {}) do
+                mod.stack = existing.stack
+            end
             event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id, refreshed = true })
-            return
+            return existing.id
         else
             M.remove_effect(state, defs, effect_def.id)
         end
@@ -508,7 +512,7 @@ function M.apply_effect(state, defs, effect_def, stack)
             apply_instant_modifiers(state, defs, effect)
         end
         event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id })
-        return
+        return nil
     end
 
     for _, tag in ipairs(effect_def.granted_tags or {}) do
@@ -517,6 +521,7 @@ function M.apply_effect(state, defs, effect_def, stack)
 
     state.effects[key] = effect
     event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id })
+    return effect.id
 end
 
 ---移除效果
@@ -530,12 +535,30 @@ function M.remove_effect(state, defs, effect_id)
         return
     end
 
-    local effect_def = defs.effect_defs[effect.id]
+    local effect_def = defs.effect_defs[effect.def_id]
     if effect_def then
         remove_granted_tags(state, effect_def.granted_tags or {}, key)
     end
     state.effects[key] = nil
     event_mod.dispatch_event(state, enum.EGameplayEvent.EffectRemoved, { effect_id = effect_id })
+end
+
+---按运行时实例 ID 移除效果
+---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
+---@param instance_id integer
+function M.remove_effect_by_instance_id(state, defs, instance_id)
+    for key, effect in pairs(state.effects) do
+        if effect.id == instance_id then
+            local effect_def = defs.effect_defs[effect.def_id]
+            if effect_def then
+                remove_granted_tags(state, effect_def.granted_tags or {}, key)
+            end
+            state.effects[key] = nil
+            event_mod.dispatch_event(state, enum.EGameplayEvent.EffectRemoved, { instance_id = instance_id })
+            return
+        end
+    end
 end
 
 ---设置效果 Stack
@@ -547,6 +570,9 @@ function M.set_effect_stack(state, effect_id, stack)
     local effect = state.effects[key]
     if effect then
         effect.stack = stack
+        for _, mod in ipairs(effect.modifiers or {}) do
+            mod.stack = stack
+        end
     end
 end
 
@@ -557,7 +583,7 @@ end
 ---@param dt number
 ---@return boolean 是否仍然存活
 local function update_effect(state, defs, effect, dt)
-    local effect_def = defs.effect_defs[effect.id]
+    local effect_def = defs.effect_defs[effect.def_id]
     if not effect_def then
         return false
     end
@@ -606,7 +632,7 @@ function M.update(state, defs, dt)
     for _, key in ipairs(expired) do
         local effect = state.effects[key]
         if effect then
-            M.remove_effect(state, defs, effect.id)
+            M.remove_effect(state, defs, effect.def_id)
         end
     end
 

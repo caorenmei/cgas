@@ -1,5 +1,5 @@
 --- Modifier 与属性聚合逻辑
---- Modifier 实例为轻量运行时状态表，仅保留 effect_id、index 与 stack，配置通过 defs 查找。
+--- Modifier 实例为轻量运行时状态表，仅保留 def_id（所属 Effect 的 Def ID）、index 与 stack，配置通过 defs 查找。
 local enum = require("mini_gas.enum")
 local tag_mod = require("mini_gas.tag")
 local log_mod = require("mini_gas.log")
@@ -9,14 +9,14 @@ local M = {}
 M.Modifier = {}
 
 ---创建轻量 Modifier 实例
----@param effect_id mini_gas.EffectId
+---@param def_id mini_gas.EffectId
 ---@param index integer
 ---@param stack number|nil
 ---@return mini_gas.Modifier
-function M.Modifier.new(effect_id, index, stack)
+function M.Modifier.new(def_id, index, stack)
     ---运行时实例仅保留定位信息与 stack，不持有 Def 或其他对象引用
     return {
-        effect_id = effect_id,
+        def_id = def_id,
         index = index,
         stack = stack,
     }
@@ -26,11 +26,19 @@ end
 ---@param mod mini_gas.Modifier
 ---@return mini_gas.ModifierDef|nil
 local function mod_def(defs, mod)
-    local effect_def = defs.effect_defs[mod.effect_id]
+    local effect_def = defs.effect_defs[mod.def_id]
     if not effect_def then
         return nil
     end
     return effect_def.modifiers[mod.index]
+end
+
+---获取 ModifierDef
+---@param defs mini_gas.Defs
+---@param mod mini_gas.Modifier
+---@return mini_gas.ModifierDef|nil
+function M.def(defs, mod)
+    return mod_def(defs, mod)
 end
 
 ---获取当前数值或复合函数

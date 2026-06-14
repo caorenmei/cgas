@@ -101,9 +101,9 @@ local fireball_def = {
     activation_policy = EAbilityActivationPolicy.Active,
     level = fireball_level,
     -- cooldown 是公式函数：self 为 GameplayAbility 实例，通过 defs 读取业务字段
-    cooldown = function(self) return calc_by_level(5, -0.2, defs.ability_defs[self.id].level) end,
+    cooldown = function(self) return calc_by_level(5, -0.2, defs.ability_defs[self.def_id].level) end,
     cost = {
-        [EAttribute.Mp] = function(self) return calc_by_level(20, 2, defs.ability_defs[self.id].level) end,
+        [EAttribute.Mp] = function(self) return calc_by_level(20, 2, defs.ability_defs[self.def_id].level) end,
     },
     effects = {
         {

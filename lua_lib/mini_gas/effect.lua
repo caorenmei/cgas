@@ -1,11 +1,23 @@
 --- GameplayEffect 运行时实例
---- 实例为轻量运行时状态表，仅保留 id 与运行时字段，配置通过 defs 查找。
+--- 实例包含运行时生成的唯一 id 与 def_id，不直接持有 Def 引用；
+--- 其包含的 Modifier 数组在创建时生成，用于按需聚合。
 local enum = require("mini_gas.enum")
 local tag_mod = require("mini_gas.tag")
+local modifier_mod = require("mini_gas.modifier")
 
 local M = {}
 
 M.GameplayEffect = {}
+
+local next_instance_id = 1
+
+---生成运行时实例唯一 ID
+---@return integer
+local function generate_instance_id()
+    local id = next_instance_id
+    next_instance_id = id + 1
+    return id
+end
 
 ---根据持续策略初始化剩余时间
 ---@param duration_policy mini_gas.EDurationPolicy
@@ -21,13 +33,22 @@ end
 ---@param stack number|nil
 ---@return mini_gas.GameplayEffect
 function M.GameplayEffect.new(def, stack)
-    ---运行时实例仅保留 id 与状态字段，不持有 Def 引用
+    stack = stack or def.stack or 1
+    local instance_id = generate_instance_id()
+    local modifiers = {}
+    for i in ipairs(def.modifiers or {}) do
+        modifiers[i] = modifier_mod.Modifier.new(def.id, i, stack)
+    end
+
+    ---运行时实例保留实例 id、def_id、状态字段以及包含的 Modifier 数组
     return {
-        id = def.id,
-        stack = stack or def.stack or 1,
+        id = instance_id,
+        def_id = def.id,
+        stack = stack,
         elapsed = 0,
         remaining = initial_remaining(def.duration_policy),
         last_trigger_count = 0,
+        modifiers = modifiers,
     }
 end
 
@@ -36,7 +57,7 @@ end
 ---@param defs mini_gas.Defs
 ---@return number
 function M.period_value(effect, defs)
-    local def = defs.effect_defs[effect.id]
+    local def = defs.effect_defs[effect.def_id]
     if not def then
         return 0
     end
@@ -56,7 +77,7 @@ end
 ---@param effect mini_gas.GameplayEffect
 ---@return boolean
 function M.meets_tag_requirements(state, defs, effect)
-    local def = defs.effect_defs[effect.id]
+    local def = defs.effect_defs[effect.def_id]
     if not def then
         return false
     end
