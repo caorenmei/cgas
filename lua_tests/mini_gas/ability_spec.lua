@@ -182,8 +182,8 @@ describe("mini_gas ability", function()
             id = "ability.fireball.leveled",
             activation_policy = EAbilityActivationPolicy.Active,
             level = 3,
-            cooldown = function(self) return self.def.level * 2 end,
-            cost = { [EAttribute.Mp] = function(self) return self.def.level * 10 end },
+            cooldown = function(self) return defs.ability_defs[self.id].level * 2 end,
+            cost = { [EAttribute.Mp] = function(self) return defs.ability_defs[self.id].level * 10 end },
             effects = {},
         }
         MiniASC.give_ability(state, defs, leveled_fireball_def)

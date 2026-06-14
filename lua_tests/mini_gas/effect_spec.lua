@@ -55,7 +55,7 @@ describe("mini_gas effect", function()
         }, 1)
         assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
 
-        MiniASC.remove_effect(state, EEffectId.BuffAttack)
+        MiniASC.remove_effect(state, defs, EEffectId.BuffAttack)
         assert.equal(100, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 
@@ -165,12 +165,13 @@ describe("mini_gas effect", function()
         MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Attack, base = 100 },
         })
+        local level = 4
         local leveled_buff_def = {
             id = "effect.buff.leveled",
             duration_policy = EDurationPolicy.Infinite,
-            level = 4,
+            level = level,
             modifiers = {
-                { attribute = EAttribute.Attack, op = EModifierOp.Compound, value = function(mod, v) return v + mod.source.def.level * 10 end },
+                { attribute = EAttribute.Attack, op = EModifierOp.Compound, value = function(_, v) return v + level * 10 end },
             },
         }
         MiniASC.apply_effect(state, defs, leveled_buff_def)

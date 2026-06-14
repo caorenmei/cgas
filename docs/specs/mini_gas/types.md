@@ -113,7 +113,7 @@ function tag_mod.matches(a, b) end
 
 `ModifierDef.value` 仅支持 `number` 或 `fun(self: Modifier, v: number): number`（用于 `Compound`）。
 
-`Modifier` 实例是**自包含**的运行时数据，保存完整的 Modifier 配置与运行时字段，不引用外部 Def。
+`Modifier` 运行时实例仅保留 `effect_id`、`index` 与 `stack`，配置通过 `defs` 查找。
 
 ```lua
 ---@class mini_gas.ModifierDef
@@ -125,28 +125,43 @@ function tag_mod.matches(a, b) end
 ---@field blocked_tags? mini_gas.TagId[]
 
 ---@class mini_gas.Modifier
----运行时实例通过 def 引用外部 ModifierDef，不复制字段
----@field def mini_gas.ModifierDef
----@field source any
----@field stack? number
+---运行时实例仅保留 effect_id、index 与 stack，配置通过 defs 查找
+---@field effect_id mini_gas.EffectId
+---@field index integer
+---@field stack number
 ```
 
 修饰器操作：
 
 ```lua
+---@param effect_id mini_gas.EffectId
+---@param index integer
+---@param stack? number
+---@return mini_gas.Modifier
+function Modifier.new(effect_id, index, stack) end
+
+---@param defs mini_gas.Defs
 ---@param mod mini_gas.Modifier
----@return number|fun(self: mini_gas.Modifier, v: number): number|nil
-function modifier_mod.value(mod) end
+---@return (number|fun(self: mini_gas.Modifier, v: number): number)|nil
+function modifier_mod.value(defs, mod) end
 
 ---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param mod mini_gas.Modifier
 ---@return boolean
-function modifier_mod.is_active(state, mod) end
+function modifier_mod.is_active(state, defs, mod) end
+
+---@param base number
+---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
+---@param modifiers mini_gas.Modifier[]
+---@return number
+function modifier_mod.calc_attribute(base, state, defs, modifiers) end
 ```
 
 #### 5.3.5 效果
 
-`EffectDef` 是静态配置；`GameplayEffect` 实例是轻量运行时状态表，通过 `def` 引用外部 EffectDef，并在创建时把 `ModifierDef[]` 转换为轻量的 `Modifier[]`。
+`EffectDef` 是静态配置；`GameplayEffect` 实例是轻量运行时状态表，仅保留 `id` 与运行时字段，配置通过 `defs` 查找。
 
 `duration` / `period` 支持常量或公式函数 `fun(self: GameplayEffect, ...): number`。
 
@@ -166,35 +181,37 @@ function modifier_mod.is_active(state, mod) end
 ---@field source any
 
 ---@class mini_gas.GameplayEffect
----运行时实例通过 def 引用外部 EffectDef，不复制字段
----@field def mini_gas.EffectDef
+---运行时实例仅保留 id 与运行时字段，配置通过 defs 查找
+---@field id mini_gas.EffectId
 ---@field stack number
 ---@field elapsed number
 ---@field remaining number
 ---@field last_trigger_count number
----@field modifiers mini_gas.Modifier[]
 ```
 
 效果操作：
 
 ```lua
+---@param def mini_gas.EffectDef
+---@param stack? number
+---@return mini_gas.GameplayEffect
+function GameplayEffect.new(def, stack) end
+
 ---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param effect mini_gas.GameplayEffect
 ---@return boolean
-function effect_mod.is_active(state, effect) end
+function effect_mod.meets_tag_requirements(state, defs, effect) end
 
 ---@param effect mini_gas.GameplayEffect
----@return mini_gas.Modifier[]
-function effect_mod.active_modifiers(effect) end
-
----@param effect mini_gas.GameplayEffect
+---@param defs mini_gas.Defs
 ---@return number
-function effect_mod.period_value(effect) end
+function effect_mod.period_value(effect, defs) end
 ```
 
 #### 5.3.6 技能
 
-`GameplayAbilityDef` 是静态配置；`GameplayAbility` 实例是轻量运行时状态表，通过 `def` 引用外部 AbilityDef。
+`GameplayAbilityDef` 是静态配置；`GameplayAbility` 实例是轻量运行时状态表，仅保留 `id` 与运行时字段，配置通过 `defs` 查找。
 
 `cooldown` / `cost[attr]` 支持常量或公式函数 `fun(self: GameplayAbility, ...): number`。
 
@@ -214,8 +231,8 @@ function effect_mod.period_value(effect) end
 ---@field source any
 
 ---@class mini_gas.GameplayAbility
----运行时实例通过 def 引用外部 AbilityDef，不复制字段
----@field def mini_gas.GameplayAbilityDef
+---运行时实例仅保留 id 与运行时字段，配置通过 defs 查找
+---@field id mini_gas.AbilityId
 ---@field stack number
 ---@field is_active boolean
 ---@field cooldown_remaining number
@@ -226,16 +243,25 @@ function effect_mod.period_value(effect) end
 技能操作：
 
 ```lua
+---@param def mini_gas.GameplayAbilityDef
+---@param stack? number
+---@return mini_gas.GameplayAbility
+function GameplayAbility.new(def, stack) end
+
 ---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param ability mini_gas.GameplayAbility
+---@param payload? table
 ---@return boolean
-function ability_mod.can_activate(state, ability) end
+function ability_mod.can_activate(state, defs, ability, payload) end
 
 ---@param ability mini_gas.GameplayAbility
+---@return boolean
 function ability_mod.activate(ability) end
 
 ---@param ability mini_gas.GameplayAbility
-function ability_mod.end_ability(ability) end
+---@param defs mini_gas.Defs
+function ability_mod.end_ability(ability, defs) end
 ```
 
 #### 5.3.7 实体状态
@@ -279,11 +305,11 @@ local MiniASC = {}
 
 function MiniASC.register_attributes(state, defs, attr_defs) end
 function MiniASC.give_ability(state, defs, ability_def, stack?) end
-function MiniASC.remove_ability(state, ability_id) end
+function MiniASC.remove_ability(state, defs, ability_id) end
 function MiniASC.set_ability_stack(state, ability_id, stack) end
 function MiniASC.try_activate_ability(state, defs, ability_id, payload?) end
 function MiniASC.apply_effect(state, defs, effect_def, stack?) end
-function MiniASC.remove_effect(state, effect_id) end
+function MiniASC.remove_effect(state, defs, effect_id) end
 function MiniASC.set_effect_stack(state, effect_id, stack) end
 function MiniASC.add_tag(state, tag) end
 function MiniASC.remove_tag(state, tag) end

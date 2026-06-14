@@ -57,11 +57,11 @@ local mini_gas = require("mini_gas")
 |------|------|
 | `MiniASC.register_attributes(state, defs, attr_defs)` | 批量注册属性定义到 `defs` 并初始化 `state.attributes` |
 | `MiniASC.give_ability(state, defs, ability_def, stack?)` | 授予技能 |
-| `MiniASC.remove_ability(state, ability_id)` | 移除技能 |
+| `MiniASC.remove_ability(state, defs, ability_id)` | 移除技能 |
 | `MiniASC.set_ability_stack(state, ability_id, stack)` | 设置技能 Stack |
 | `MiniASC.try_activate_ability(state, defs, ability_id, payload?)` | 尝试激活技能 |
 | `MiniASC.apply_effect(state, defs, effect_def, stack?)` | 应用效果 |
-| `MiniASC.remove_effect(state, effect_id)` | 移除效果 |
+| `MiniASC.remove_effect(state, defs, effect_id)` | 移除效果 |
 | `MiniASC.set_effect_stack(state, effect_id, stack)` | 设置效果 Stack |
 | `MiniASC.add_tag(state, tag)` | 添加标签 |
 | `MiniASC.remove_tag(state, tag)` | 移除标签 |
@@ -96,9 +96,10 @@ function mini_gas.adapt_abilities(raw_configs, adapter) end
 ---计算单个属性的 Current 值（无状态纯函数）
 ---@param base number
 ---@param entity_state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param modifiers mini_gas.Modifier[]
 ---@return number
-function mini_gas.calc_attribute(base, entity_state, modifiers) end
+function mini_gas.calc_attribute(base, entity_state, defs, modifiers) end
 ```
 
 ---

@@ -68,10 +68,11 @@ end
 ---计算单个属性的 Current 值（无状态纯函数）
 ---@param base number
 ---@param entity_state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param modifiers mini_gas.Modifier[]
 ---@return number
-function M.calc_attribute(base, entity_state, modifiers)
-    return modifier.calc_attribute(base, entity_state, modifiers)
+function M.calc_attribute(base, entity_state, defs, modifiers)
+    return modifier.calc_attribute(base, entity_state, defs, modifiers)
 end
 
 return M

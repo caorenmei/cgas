@@ -47,7 +47,7 @@ MiniASC.apply_effect(hero_state, defs, {
     modifiers = {
         { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 50 },
     },
-}, 1, 1)
+}, 1)
 
 -- 4. VIP 效果（永久）
 MiniASC.apply_effect(hero_state, defs, {
@@ -56,7 +56,7 @@ MiniASC.apply_effect(hero_state, defs, {
     modifiers = {
         { attribute = EAttribute.GoldGainRate, op = EModifierOp.Multiply, value = 1.15 },
     },
-}, 1, 1)
+}, 1)
 
 -- 5. 计算结果
 print(MiniASC.get_current(hero_state, defs, EAttribute.Attack))        -- 150
@@ -95,13 +95,15 @@ local function calc_by_level(base, growth, level)
     return base + (level - 1) * growth
 end
 
+local fireball_level = 3
 local fireball_def = {
     id = EAbilityId.Fireball,
     activation_policy = EAbilityActivationPolicy.Active,
-    -- cooldown 是公式函数：self 为 GameplayAbility 实例
-    cooldown = function(self) return calc_by_level(5, -0.2, self.level) end,
+    level = fireball_level,
+    -- cooldown 是公式函数：self 为 GameplayAbility 实例，通过 defs 读取业务字段
+    cooldown = function(self) return calc_by_level(5, -0.2, defs.ability_defs[self.id].level) end,
     cost = {
-        [EAttribute.Mp] = function(self) return calc_by_level(20, 2, self.level) end,
+        [EAttribute.Mp] = function(self) return calc_by_level(20, 2, defs.ability_defs[self.id].level) end,
     },
     effects = {
         {
@@ -111,14 +113,14 @@ local fireball_def = {
                 {
                     attribute = EAttribute.Hp,
                     op = EModifierOp.Add,
-                    value = calc_by_level(-100, -15, 3), -- 3 级时 -130
+                    value = calc_by_level(-100, -15, fireball_level), -- 3 级时 -130
                 },
             },
         },
     },
 }
 
-MiniASC.give_ability(hero_state, defs, fireball_def, 3, 1)
+MiniASC.give_ability(hero_state, defs, fireball_def, 1)
 local ok = MiniASC.try_activate_ability(hero_state, defs, EAbilityId.Fireball)
 ```
 
@@ -170,7 +172,7 @@ local attack_aura_def = {
     },
 }
 
-MiniASC.give_ability(hero_state, defs, attack_aura_def, 1, 1)
+MiniASC.give_ability(hero_state, defs, attack_aura_def, 1)
 -- 被动技能自动生效
 ```
 
@@ -226,7 +228,7 @@ local counter_attack_def = {
     },
 }
 
-MiniASC.give_ability(hero_state, defs, counter_attack_def, 1, 1)
+MiniASC.give_ability(hero_state, defs, counter_attack_def, 1)
 -- 当 DamageTaken 事件触发且满足标签条件时，自动尝试激活
 ```
 
@@ -260,7 +262,7 @@ MiniASC.apply_effect(city_state, city_defs, {
     modifiers = {
         { attribute = EAttribute.IronOutput, op = EModifierOp.Add, value = 100 },
     },
-}, 1, 1)
+}, 1)
 
 -- 在游戏主循环中调用
 MiniASC.update(city_state, city_defs, dt)
@@ -355,7 +357,7 @@ MiniASC.apply_effect(state, defs, {
         { attribute = EAttribute.Attack,  op = EModifierOp.Add, value = 80 },
         { attribute = EAttribute.Defense, op = EModifierOp.Add, value = 30 },
     },
-}, 1, 1)
+}, 1)
 
 -- 宠物：小龙（5 级），Granted pet.active 标签
 MiniASC.apply_effect(state, defs, {
@@ -365,7 +367,7 @@ MiniASC.apply_effect(state, defs, {
     modifiers = {
         { attribute = EAttribute.Attack, op = EModifierOp.Add, value = calc_by_level(20, 5, 5) }, -- 5 级时 40
     },
-}, 5, 1)
+}, 1)
 
 -- VIP 特权：Granted buff.vip 标签，并提升金币/经验倍率
 MiniASC.apply_effect(state, defs, {
@@ -376,7 +378,7 @@ MiniASC.apply_effect(state, defs, {
         { attribute = EAttribute.GoldGainRate, op = EModifierOp.Multiply, value = 1.2 },
         { attribute = EAttribute.ExpGainRate,  op = EModifierOp.Multiply, value = 1.1 },
     },
-}, 1, 1)
+}, 1)
 
 -- 主动技能：普通攻击
 -- Require Tags：必须携带宠物；Blocked Tags：沉默时无法使用
@@ -397,7 +399,7 @@ local hero_attack_def = {
         },
     },
 }
-MiniASC.give_ability(state, defs, hero_attack_def, 1, 1)
+MiniASC.give_ability(state, defs, hero_attack_def, 1)
 
 -- 金矿：每 60 秒产出 100 金币；VIP 额外 ×1.2
 MiniASC.apply_effect(state, defs, {
@@ -410,7 +412,7 @@ MiniASC.apply_effect(state, defs, {
         -- VIP 加成：需要 buff.vip 标签才生效
         { attribute = EAttribute.Gold, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Buff_Vip } },
     },
-}, 1, 1)
+}, 1)
 
 -- 铁矿厂：每 60 秒产出 50 铁矿；VIP 额外 ×1.2
 MiniASC.apply_effect(state, defs, {
@@ -421,7 +423,7 @@ MiniASC.apply_effect(state, defs, {
         { attribute = EAttribute.Iron, op = EModifierOp.Add, value = 50 },
         { attribute = EAttribute.Iron, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Buff_Vip } },
     },
-}, 1, 1)
+}, 1)
 
 -- 使用 WorldState 管理实体（本质是 table<EntityId, EntityState>）
 local world = WorldState.new()

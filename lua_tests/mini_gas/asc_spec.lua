@@ -108,7 +108,7 @@ describe("mini_gas asc", function()
             modifiers = { { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 1 } },
         }, 1)
         MiniASC.apply_effect(state2, defs, {
-            id = EEffectId.GoldMine,
+            id = "effect.building.gold_mine.rich",
             duration_policy = EDurationPolicy.Infinite,
             period = 1,
             modifiers = { { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 2 } },

@@ -1,5 +1,5 @@
 --- GameplayAbility 运行时实例
---- 实例为轻量运行时状态表，通过 `def` 字段引用外部 Def，不复制 Def 字段。
+--- 实例为轻量运行时状态表，仅保留 id 与运行时字段，配置通过 defs 查找。
 local tag_mod = require("mini_gas.tag")
 
 local M = {}
@@ -24,9 +24,9 @@ end
 ---@param stack number|nil
 ---@return mini_gas.GameplayAbility
 function M.GameplayAbility.new(def, stack)
-    ---运行时实例仅保留状态字段，配置字段通过 def 引用读取
+    ---运行时实例仅保留 id 与状态字段，不持有 Def 引用
     return {
-        def = def,
+        id = def.id,
         stack = stack or def.stack or 1,
         is_active = false,
         cooldown_remaining = 0,
@@ -37,10 +37,11 @@ end
 
 ---检查当前是否可以激活
 ---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param ability mini_gas.GameplayAbility
 ---@param payload table|nil
 ---@return boolean
-function M.can_activate(state, ability, payload)
+function M.can_activate(state, defs, ability, payload)
     if ability.is_active then
         return false
     end
@@ -48,7 +49,11 @@ function M.can_activate(state, ability, payload)
         return false
     end
 
-    local def = ability.def
+    local def = defs.ability_defs[ability.id]
+    if not def then
+        return false
+    end
+
     local container = state.tags
     local req = def.require_tags or {}
     local blocked = def.blocked_tags or {}
@@ -89,9 +94,11 @@ end
 
 ---结束技能
 ---@param ability mini_gas.GameplayAbility
-function M.end_ability(ability)
+---@param defs mini_gas.Defs
+function M.end_ability(ability, defs)
     ability.is_active = false
-    ability.cooldown_remaining = resolve_value(ability.def.cooldown or 0, ability)
+    local def = defs.ability_defs[ability.id]
+    ability.cooldown_remaining = resolve_value(def and def.cooldown or 0, ability)
 end
 
 M.resolve_value = resolve_value

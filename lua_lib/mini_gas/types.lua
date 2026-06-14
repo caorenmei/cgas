@@ -32,10 +32,10 @@
 ---@field blocked_tags? mini_gas.TagId[]
 
 ---@class mini_gas.Modifier
----运行时实例通过 def 引用外部 ModifierDef，不复制字段
----@field def mini_gas.ModifierDef
----@field source any
----@field stack? number
+---运行时实例仅保留 effect_id、index 与 stack，配置通过 defs 查找
+---@field effect_id mini_gas.EffectId
+---@field index integer
+---@field stack number
 
 ---@class mini_gas.EffectDef
 ---@field id mini_gas.EffectId
@@ -52,13 +52,12 @@
 ---@field source any
 
 ---@class mini_gas.GameplayEffect
----运行时实例通过 def 引用外部 EffectDef，不复制字段
----@field def mini_gas.EffectDef
+---运行时实例仅保留 id 与运行时字段，配置通过 defs 查找
+---@field id mini_gas.EffectId
 ---@field stack number
 ---@field elapsed number
 ---@field remaining number
 ---@field last_trigger_count number
----@field modifiers mini_gas.Modifier[]
 
 ---@class mini_gas.GameplayAbilityDef
 ---@field id mini_gas.AbilityId
@@ -75,8 +74,8 @@
 ---@field source any
 
 ---@class mini_gas.GameplayAbility
----运行时实例通过 def 引用外部 AbilityDef，不复制字段
----@field def mini_gas.GameplayAbilityDef
+---运行时实例仅保留 id 与运行时字段，配置通过 defs 查找
+---@field id mini_gas.AbilityId
 ---@field stack number
 ---@field is_active boolean
 ---@field cooldown_remaining number

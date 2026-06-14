@@ -74,7 +74,7 @@ flowchart LR
 
 Modifier 的 `value` 类型为 `number`（用于 `Add` / `Multiply` / `Override`）或 `fun(self: Modifier, v: number): number`（仅用于 `Compound`）。
 
-Modifier 实例是**自包含**的运行时数据，在 `apply_effect` 时由 `ModifierDef` 复制生成，不引用外部 Def。若需要按等级成长，应由 `ConfigAdapter` 在 `apply_effect` 前按目标等级生成对应的 `number` 值。
+Modifier 运行时实例仅保留 `effect_id`、`index` 与 `stack`，配置通过传入的 `defs` 查找。若需要按等级成长，应由 `ConfigAdapter` 在 `apply_effect` 前按目标等级生成对应的 `number` 值，或在 Compound 公式中通过闭包捕获等级信息。
 
 ### 6.4 GameplayEffect
 

@@ -292,7 +292,7 @@ function M.can_use_ability(state, ability_id)
     if not ability then
         return false
     end
-    return ability_mod.can_activate(state, ability)
+    return ability_mod.can_activate(state, defs, ability)
 end
 
 ---@param state mini_gas.demo.weihu_shan.GameState

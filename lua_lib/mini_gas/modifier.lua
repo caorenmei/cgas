@@ -1,5 +1,5 @@
 --- Modifier 与属性聚合逻辑
---- Modifier 实例为轻量运行时状态表，通过 `def` 字段引用外部 ModifierDef，不复制 Def 字段。
+--- Modifier 实例为轻量运行时状态表，仅保留 effect_id、index 与 stack，配置通过 defs 查找。
 local enum = require("mini_gas.enum")
 local tag_mod = require("mini_gas.tag")
 local log_mod = require("mini_gas.log")
@@ -9,32 +9,49 @@ local M = {}
 M.Modifier = {}
 
 ---创建轻量 Modifier 实例
----@param mod_def mini_gas.ModifierDef
----@param source any
+---@param effect_id mini_gas.EffectId
+---@param index integer
 ---@param stack number|nil
 ---@return mini_gas.Modifier
-function M.Modifier.new(mod_def, source, stack)
-    ---运行时实例仅保留状态字段，配置字段通过 def 引用读取
+function M.Modifier.new(effect_id, index, stack)
+    ---运行时实例仅保留定位信息与 stack，不持有 Def 或其他对象引用
     return {
-        def = mod_def,
-        source = source,
+        effect_id = effect_id,
+        index = index,
         stack = stack,
     }
 end
 
----获取当前数值或复合函数
+---@param defs mini_gas.Defs
 ---@param mod mini_gas.Modifier
----@return number|fun(self: mini_gas.Modifier, v: number): number|nil
-function M.value(mod)
-    return mod.def.value
+---@return mini_gas.ModifierDef|nil
+local function mod_def(defs, mod)
+    local effect_def = defs.effect_defs[mod.effect_id]
+    if not effect_def then
+        return nil
+    end
+    return effect_def.modifiers[mod.index]
+end
+
+---获取当前数值或复合函数
+---@param defs mini_gas.Defs
+---@param mod mini_gas.Modifier
+---@return (number|fun(self: mini_gas.Modifier, v: number): number)|nil
+function M.value(defs, mod)
+    local def = mod_def(defs, mod)
+    return def and def.value
 end
 
 ---判断 Modifier 是否满足标签约束
 ---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param mod mini_gas.Modifier
 ---@return boolean
-function M.is_active(state, mod)
-    local def = mod.def
+function M.is_active(state, defs, mod)
+    local def = mod_def(defs, mod)
+    if not def then
+        return false
+    end
     local container = state.tags
     local req = def.require_tags or {}
     local blocked = def.blocked_tags or {}
@@ -44,20 +61,25 @@ end
 ---计算单个属性的 Current 值（无状态纯函数）
 ---@param base number
 ---@param state mini_gas.EntityState
+---@param defs mini_gas.Defs
 ---@param modifiers mini_gas.Modifier[]
 ---@return number
-function M.calc_attribute(base, state, modifiers)
+function M.calc_attribute(base, state, defs, modifiers)
     local add_sum = 0
     local multiply_product = 1
     local overrides = {}
     local compounds = {}
 
     for _, mod in ipairs(modifiers or {}) do
-        if not M.is_active(state, mod) then
+        if not M.is_active(state, defs, mod) then
             goto continue
         end
 
-        local def = mod.def
+        local def = mod_def(defs, mod)
+        if not def then
+            goto continue
+        end
+
         local op = def.op
         if op == enum.EModifierOp.Compound then
             compounds[#compounds + 1] = { fn = def.value, priority = def.priority or 0, mod = mod }
