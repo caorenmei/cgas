@@ -53,7 +53,7 @@ describe("mini_gas ability", function()
                     },
                 },
             },
-        }, 1, 1)
+        }, 1)
 
         assert.is_true(MiniASC.has_tag(state, ETag.AuraBuff))
         assert.equal(120, MiniASC.get_current(state, defs, EAttribute.Attack))
@@ -82,7 +82,7 @@ describe("mini_gas ability", function()
                     },
                 },
             },
-        }, 1, 1)
+        }, 1)
 
         local ok = MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball)
         assert.is_true(ok)
@@ -113,7 +113,7 @@ describe("mini_gas ability", function()
             require_tags = { ETag.Combat },
             blocked_tags = { ETag.Stunned },
             effects = {},
-        }, 1, 1)
+        }, 1)
 
         assert.is_false(MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball))
         MiniASC.add_tag(state, ETag.Combat)
@@ -140,7 +140,7 @@ describe("mini_gas ability", function()
                 return true
             end,
             effects = {},
-        }, 1, 1)
+        }, 1)
         local payload = { reason = "test" }
         MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball, payload)
         assert.equal("test", received_payload.reason)
@@ -166,9 +166,29 @@ describe("mini_gas ability", function()
                     },
                 },
             },
-        }, 1, 1)
+        }, 1)
 
         MiniASC.set_current(state, defs, EAttribute.Hp, 90)
         assert.equal(80, MiniASC.get_current(state, defs, EAttribute.Hp))
+    end)
+
+    it("ability subclass with level scales cooldown and cost", function()
+        local state = EntityState.new()
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
+            { name = EAttribute.Mp, base = 200, min = 0, max = 200 },
+        })
+        local leveled_fireball_def = {
+            id = "ability.fireball.leveled",
+            activation_policy = EAbilityActivationPolicy.Active,
+            level = 3,
+            cooldown = function(self) return self.level * 2 end,
+            cost = { [EAttribute.Mp] = function(self) return self.level * 10 end },
+            effects = {},
+        }
+        MiniASC.give_ability(state, defs, leveled_fireball_def)
+        MiniASC.try_activate_ability(state, defs, "ability.fireball.leveled")
+        assert.equal(170, MiniASC.get_current(state, defs, EAttribute.Mp))
+        assert.equal(6, state.abilities["ability.fireball.leveled"].cooldown_remaining)
     end)
 end)

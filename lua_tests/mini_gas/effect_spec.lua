@@ -36,7 +36,7 @@ describe("mini_gas effect", function()
             modifiers = {
                 { attribute = EAttribute.Hp, op = EModifierOp.Add, value = -20 },
             },
-        }, 1, 1)
+        }, 1)
         assert.equal(80, MiniASC.get_current(state, defs, EAttribute.Hp))
     end)
 
@@ -52,7 +52,7 @@ describe("mini_gas effect", function()
             modifiers = {
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 50 },
             },
-        }, 1, 1)
+        }, 1)
         assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
 
         MiniASC.remove_effect(state, EEffectId.BuffAttack)
@@ -72,7 +72,7 @@ describe("mini_gas effect", function()
             modifiers = {
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 50 },
             },
-        }, 1, 1)
+        }, 1)
         assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
 
         MiniASC.update(state, defs, 1)
@@ -95,7 +95,7 @@ describe("mini_gas effect", function()
             modifiers = {
                 { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 10 },
             },
-        }, 1, 1)
+        }, 1)
 
         MiniASC.update(state, defs, 2.5)
         assert.equal(20, MiniASC.get_current(state, defs, EAttribute.Gold))
@@ -116,8 +116,8 @@ describe("mini_gas effect", function()
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 10 },
             },
         }
-        MiniASC.apply_effect(state, defs, def, 1, 1)
-        MiniASC.apply_effect(state, defs, def, 1, 2)
+        MiniASC.apply_effect(state, defs, def, 1)
+        MiniASC.apply_effect(state, defs, def, 2)
         assert.equal(130, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 
@@ -133,7 +133,7 @@ describe("mini_gas effect", function()
             modifiers = {
                 { attribute = EAttribute.Hp, op = EModifierOp.Compound, value = function(_, v) return v * 2 end },
             },
-        }, 1, 1)
+        }, 1)
         assert.equal(200, MiniASC.get_current(state, defs, EAttribute.Hp))
     end)
 
@@ -152,10 +152,28 @@ describe("mini_gas effect", function()
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 50 },
             },
         }
-        MiniASC.apply_effect(state, defs, def, 1, 1)
+        MiniASC.apply_effect(state, defs, def, 1)
         MiniASC.update(state, defs, 1)
-        MiniASC.apply_effect(state, defs, def, 1, 1)
+        MiniASC.apply_effect(state, defs, def, 1)
         MiniASC.update(state, defs, 1.5)
         assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
+    end)
+
+    it("effect subclass with level scales modifier via compound", function()
+        local state = EntityState.new()
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
+            { name = EAttribute.Attack, base = 100 },
+        })
+        local leveled_buff_def = {
+            id = "effect.buff.leveled",
+            duration_policy = EDurationPolicy.Infinite,
+            level = 4,
+            modifiers = {
+                { attribute = EAttribute.Attack, op = EModifierOp.Compound, value = function(mod, v) return v + mod.level * 10 end },
+            },
+        }
+        MiniASC.apply_effect(state, defs, leveled_buff_def)
+        assert.equal(140, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 end)

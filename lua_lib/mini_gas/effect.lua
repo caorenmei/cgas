@@ -19,6 +19,17 @@ local function copy_array(arr)
     return result
 end
 
+---浅拷贝普通表（不递归，保留函数引用）
+---@param t table|nil
+---@return table
+local function shallow_copy(t)
+    local result = {}
+    for k, v in pairs(t or {}) do
+        result[k] = v
+    end
+    return result
+end
+
 ---根据持续策略初始化剩余时间
 ---@param duration_policy mini_gas.EDurationPolicy
 ---@return number
@@ -30,33 +41,24 @@ local function initial_remaining(duration_policy)
 end
 
 ---@param def mini_gas.EffectDef
----@param level number
 ---@param stack number|nil
 ---@return mini_gas.GameplayEffect
-function M.GameplayEffect.new(def, level, stack)
-    level = level or 1
-    stack = stack or 1
-    local effect = {
-        id = def.id,
-        alias = def.alias,
-        duration_policy = def.duration_policy,
-        duration = def.duration,
-        period = def.period,
-        stacking = def.stacking,
-        max_stack = def.max_stack,
-        granted_tags = copy_array(def.granted_tags),
-        require_tags = copy_array(def.require_tags),
-        blocked_tags = copy_array(def.blocked_tags),
-        source = def.source,
-        level = level,
-        stack = stack,
-        elapsed = 0,
-        remaining = initial_remaining(def.duration_policy),
-        last_trigger_count = 0,
-        modifiers = {},
-    }
+function M.GameplayEffect.new(def, stack)
+    ---子类可在 def 中携带 level 等成长字段，基类不再自动注入 level
+    local effect = shallow_copy(def)
+    -- 数组字段深拷贝一层，避免运行时修改影响 Def
+    effect.granted_tags = copy_array(def.granted_tags)
+    effect.require_tags = copy_array(def.require_tags)
+    effect.blocked_tags = copy_array(def.blocked_tags)
+    -- 运行时状态字段
+    stack = stack or def.stack or 1
+    effect.stack = stack
+    effect.elapsed = 0
+    effect.remaining = initial_remaining(def.duration_policy)
+    effect.last_trigger_count = 0
+    effect.modifiers = {}
     for i, mod_def in ipairs(def.modifiers or {}) do
-        effect.modifiers[i] = modifier_mod.Modifier.new(mod_def, level, effect, stack)
+        effect.modifiers[i] = modifier_mod.Modifier.new(mod_def, effect, stack)
     end
     return effect
 end

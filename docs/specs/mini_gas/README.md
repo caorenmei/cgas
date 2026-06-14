@@ -46,7 +46,7 @@ Gameplay Ability System（GAS）参考 Unreal Engine 的设计思想，覆盖 Ab
 
 - **核心子系统**：具备 GameplayAbility、GameplayTag、GameplayEffect、Modifier、Attribute 等核心能力。
 - **代码独立**：目录独立为 `lua_lib/mini_gas`，不依赖任何外部 GAS 实现或共享源码文件。
-- **Level / Stack 驱动成长**：Ability / Effect / Modifier 的运行时实例携带 `level` / `stack`，Def 中的公式函数读取这些字段完成数值缩放。
+- **Stack 驱动堆叠，子类实现成长**：Ability / Effect 的运行时实例携带 `stack`；等级、成长曲线等由业务子类在 Def 中自行携带（如 `level`），公式函数读取这些字段完成数值缩放。
 - **无魔术字符串**：所有标识符、标签、属性名、操作类型均通过 `@enum` 常量或 `@class` 类型定义，禁止在业务代码中直接书写字面量。
 - **状态完全自包含**：运行时状态对象不引用任何外部对象（包括配置 Def、下划线查找表），可直接序列化与网络同步。
 - **Defs 分离**：配置定义集中存放在 `Defs` 表中，由调用方持有并在需要的 API 中传入。

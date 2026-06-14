@@ -73,7 +73,7 @@ describe("mini_gas integration", function()
                 { attribute = EAttribute.Attack,  op = EModifierOp.Add, value = 80 },
                 { attribute = EAttribute.Defense, op = EModifierOp.Add, value = 30 },
             },
-        }, 1, 1)
+        }, 1)
 
         -- 宠物：小龙（5 级）
         MiniASC.apply_effect(state, defs, {
@@ -83,7 +83,7 @@ describe("mini_gas integration", function()
             modifiers = {
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = make_linear(20, 5)(nil, 5) },
             },
-        }, 5, 1)
+        }, 1)
 
         -- VIP 特权
         MiniASC.apply_effect(state, defs, {
@@ -94,7 +94,7 @@ describe("mini_gas integration", function()
                 { attribute = EAttribute.GoldGainRate, op = EModifierOp.Multiply, value = 1.2 },
                 { attribute = EAttribute.ExpGainRate,  op = EModifierOp.Multiply, value = 1.1 },
             },
-        }, 1, 1)
+        }, 1)
 
         -- 主动技能：普通攻击
         local hero_attack_def = {
@@ -114,7 +114,7 @@ describe("mini_gas integration", function()
                 },
             },
         }
-        MiniASC.give_ability(state, defs, hero_attack_def, 1, 1)
+        MiniASC.give_ability(state, defs, hero_attack_def, 1)
 
         -- 金矿
         MiniASC.apply_effect(state, defs, {
@@ -125,7 +125,7 @@ describe("mini_gas integration", function()
                 { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 100 },
                 { attribute = EAttribute.Gold, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Buff_Vip } },
             },
-        }, 1, 1)
+        }, 1)
 
         -- 铁矿厂
         MiniASC.apply_effect(state, defs, {
@@ -136,7 +136,7 @@ describe("mini_gas integration", function()
                 { attribute = EAttribute.Iron, op = EModifierOp.Add, value = 50 },
                 { attribute = EAttribute.Iron, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Buff_Vip } },
             },
-        }, 1, 1)
+        }, 1)
 
         -- WorldState 管理
         local world = WorldState.new()

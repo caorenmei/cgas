@@ -53,7 +53,7 @@ describe("mini_gas asc", function()
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 80 },
                 { attribute = EAttribute.Defense, op = EModifierOp.Add, value = 30 },
             },
-        }, 1, 1)
+        }, 1)
 
         MiniASC.apply_effect(state, defs, {
             id = EEffectId.Vip,
@@ -63,7 +63,7 @@ describe("mini_gas asc", function()
                 { attribute = EAttribute.GoldGainRate, op = EModifierOp.Multiply, value = 1.2 },
                 { attribute = EAttribute.ExpGainRate, op = EModifierOp.Multiply, value = 1.1 },
             },
-        }, 1, 1)
+        }, 1)
 
         MiniASC.apply_effect(state, defs, {
             id = EEffectId.GoldMine,
@@ -73,7 +73,7 @@ describe("mini_gas asc", function()
                 { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 100 },
                 { attribute = EAttribute.Gold, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Vip } },
             },
-        }, 1, 1)
+        }, 1)
 
         MiniASC.apply_effect(state, defs, {
             id = EEffectId.IronMine,
@@ -83,7 +83,7 @@ describe("mini_gas asc", function()
                 { attribute = EAttribute.Iron, op = EModifierOp.Add, value = 50 },
                 { attribute = EAttribute.Iron, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Vip } },
             },
-        }, 1, 1)
+        }, 1)
 
         MiniASC.update(state, defs, 120)
 
@@ -106,13 +106,13 @@ describe("mini_gas asc", function()
             duration_policy = EDurationPolicy.Infinite,
             period = 1,
             modifiers = { { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 1 } },
-        }, 1, 1)
+        }, 1)
         MiniASC.apply_effect(state2, defs, {
             id = EEffectId.GoldMine,
             duration_policy = EDurationPolicy.Infinite,
             period = 1,
             modifiers = { { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 2 } },
-        }, 1, 1)
+        }, 1)
         state_mod.register_entity(world, "s1", state1)
         state_mod.register_entity(world, "s2", state2)
 

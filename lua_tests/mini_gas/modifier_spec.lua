@@ -8,7 +8,7 @@ local GameplayTagContainer = require("mini_gas.tag").GameplayTagContainer
 local function make_mods(mod_defs)
     local mods = {}
     for i, def in ipairs(mod_defs) do
-        mods[i] = Modifier.new(def, 1, nil, 1)
+        mods[i] = Modifier.new(def, nil, 1)
     end
     return mods
 end

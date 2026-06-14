@@ -29,32 +29,24 @@ local function shallow_copy(t)
 end
 
 ---@param def mini_gas.GameplayAbilityDef
----@param level number
 ---@param stack number|nil
 ---@return mini_gas.GameplayAbility
-function M.GameplayAbility.new(def, level, stack)
-    level = level or 1
-    stack = stack or 1
-    return {
-        id = def.id,
-        alias = def.alias,
-        activation_policy = def.activation_policy,
-        cooldown = def.cooldown,
-        cost = shallow_copy(def.cost),
-        require_tags = copy_array(def.require_tags),
-        blocked_tags = copy_array(def.blocked_tags),
-        grant_tags = copy_array(def.grant_tags),
-        activation_event = def.activation_event,
-        effects = copy_array(def.effects),
-        can_activate = def.can_activate,
-        source = def.source,
-        level = level,
-        stack = stack,
-        is_active = false,
-        cooldown_remaining = 0,
-        listener = nil,
-        spawned_effects = {},
-    }
+function M.GameplayAbility.new(def, stack)
+    ---子类可在 def 中携带 level 等成长字段，基类不再自动注入 level
+    local ability = shallow_copy(def)
+    -- 数组/table 字段深拷贝一层，避免运行时修改影响 Def
+    ability.cost = shallow_copy(def.cost)
+    ability.require_tags = copy_array(def.require_tags)
+    ability.blocked_tags = copy_array(def.blocked_tags)
+    ability.grant_tags = copy_array(def.grant_tags)
+    ability.effects = copy_array(def.effects)
+    -- 运行时状态字段
+    ability.stack = stack or def.stack or 1
+    ability.is_active = false
+    ability.cooldown_remaining = 0
+    ability.listener = nil
+    ability.spawned_effects = {}
+    return ability
 end
 
 ---解析数值（常量或公式函数）

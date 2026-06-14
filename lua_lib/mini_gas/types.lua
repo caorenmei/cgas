@@ -69,7 +69,6 @@
 ---@field require_tags? mini_gas.TagId[]
 ---@field blocked_tags? mini_gas.TagId[]
 ---@field source any
----@field level number
 ---@field stack number
 ---@field elapsed number
 ---@field remaining number
@@ -102,7 +101,6 @@
 ---@field effects? mini_gas.EffectDef[]
 ---@field can_activate? fun(state: mini_gas.EntityState, payload: table?): boolean?
 ---@field source any
----@field level number
 ---@field stack number
 ---@field is_active boolean
 ---@field cooldown_remaining number

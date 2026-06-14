@@ -183,7 +183,6 @@ function modifier_mod.is_active(state, mod) end
 ---@field require_tags? mini_gas.TagId[]
 ---@field blocked_tags? mini_gas.TagId[]
 ---@field source any
----@field level number
 ---@field stack number
 ---@field elapsed number
 ---@field remaining number
@@ -241,7 +240,6 @@ function effect_mod.period_value(effect) end
 ---@field effects? mini_gas.EffectDef[]
 ---@field can_activate? fun(state: mini_gas.EntityState, payload: table?): boolean?
 ---@field source any
----@field level number
 ---@field stack number
 ---@field is_active boolean
 ---@field cooldown_remaining number
@@ -303,14 +301,12 @@ function mini_gas.register_entity(world, id, state) end
 local MiniASC = {}
 
 function MiniASC.register_attributes(state, defs, attr_defs) end
-function MiniASC.give_ability(state, defs, spec, level, stack?) end
+function MiniASC.give_ability(state, defs, ability_def, stack?) end
 function MiniASC.remove_ability(state, ability_id) end
-function MiniASC.set_ability_level(state, ability_id, level) end
 function MiniASC.set_ability_stack(state, ability_id, stack) end
 function MiniASC.try_activate_ability(state, defs, ability_id, payload?) end
-function MiniASC.apply_effect(state, defs, spec, level, stack?) end
+function MiniASC.apply_effect(state, defs, effect_def, stack?) end
 function MiniASC.remove_effect(state, effect_id) end
-function MiniASC.set_effect_level(state, effect_id, level) end
 function MiniASC.set_effect_stack(state, effect_id, stack) end
 function MiniASC.add_tag(state, tag) end
 function MiniASC.remove_tag(state, tag) end

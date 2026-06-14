@@ -153,7 +153,7 @@ function M.new_game()
     MiniASC.add_tag(state, M.ETag.UnderInterrogation)
 
     for _, def in pairs(ability_defs) do
-        MiniASC.give_ability(state, defs, def, 1, 1)
+        MiniASC.give_ability(state, defs, def, 1)
     end
 
     state._round = 1
@@ -202,16 +202,16 @@ function M.act(state, ability_id, choice)
 
     if ability_id == M.EAbilityId.AnswerLingo then
         if choice == "success" then
-            MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.LingoSuccess], 1, 1)
+            MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.LingoSuccess], 1)
             result.message = "你对上了黑话，座山雕点了点头。"
             result.success = true
         else
-            MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.LingoFail], 1, 1)
+            MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.LingoFail], 1)
             result.message = "你答错了黑话，座山雕皱起了眉头。"
         end
     elseif ability_id == M.EAbilityId.ShowMap then
         -- 献图：应用震撼效果后判定最终结局
-        MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.MapShock], 1, 1)
+        MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.MapShock], 1)
         local cred = MiniASC.get_current(state, defs, M.EAttribute.Credibility)
         local susp = MiniASC.get_current(state, defs, M.EAttribute.Suspicion)
         state._game_over = true

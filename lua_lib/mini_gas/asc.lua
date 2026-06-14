@@ -223,17 +223,15 @@ end
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
 ---@param ability_def mini_gas.GameplayAbilityDef
----@param level number?
 ---@param stack number?
-function M.give_ability(state, defs, ability_def, level, stack)
-    level = level or 1
+function M.give_ability(state, defs, ability_def, stack)
     stack = stack or 1
     local key = ability_key(ability_def.id)
     if state.abilities[key] then
         return
     end
     defs.ability_defs[ability_def.id] = ability_def
-    local ability = ability_mod.GameplayAbility.new(ability_def, level, stack)
+    local ability = ability_mod.GameplayAbility.new(ability_def, stack)
     state.abilities[key] = ability
 
     for _, tag in ipairs(ability.grant_tags or {}) do
@@ -283,20 +281,6 @@ function M.remove_ability(state, ability_id)
     end
 
     state.abilities[key] = nil
-end
-
----设置技能等级
----@param state mini_gas.EntityState
----@param ability_id mini_gas.AbilityId
----@param level number
-function M.set_ability_level(state, ability_id, level)
-    local key = ability_key(ability_id)
-    local ability = state.abilities[key]
-    if not ability then
-        return
-    end
-    ability.level = level
-    -- 技能的等级变化不自动级联到已产生的效果；效果等级应由效果自身或业务方独立管理
 end
 
 ---设置技能 Stack
@@ -363,7 +347,7 @@ function M.try_activate_ability(state, defs, ability_id, payload)
             cloned[k] = v
         end
         cloned.source = ability_id
-        M.apply_effect(state, defs, cloned, ability.level, ability.stack)
+        M.apply_effect(state, defs, cloned, ability.stack)
         table.insert(ability.spawned_effects, cloned.id)
     end
 
@@ -466,10 +450,8 @@ end
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
 ---@param effect_def mini_gas.EffectDef
----@param level number?
 ---@param stack number?
-function M.apply_effect(state, defs, effect_def, level, stack)
-    level = level or 1
+function M.apply_effect(state, defs, effect_def, stack)
     stack = stack or 1
     local key = effect_key(effect_def.id)
     defs.effect_defs[effect_def.id] = effect_def
@@ -489,10 +471,8 @@ function M.apply_effect(state, defs, effect_def, level, stack)
         elseif policy == enum.EStackingPolicy.Refresh then
             existing.remaining = resolve(effect_def.duration, existing)
             existing.stack = math.max(existing.stack, stack)
-            existing.level = level
             for _, mod in ipairs(existing.modifiers) do
                 mod.stack = existing.stack
-                mod.level = existing.level
             end
             event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = effect_def.id, refreshed = true })
             return
@@ -501,7 +481,7 @@ function M.apply_effect(state, defs, effect_def, level, stack)
         end
     end
 
-    local effect = effect_mod.GameplayEffect.new(effect_def, level, stack)
+    local effect = effect_mod.GameplayEffect.new(effect_def, stack)
     if effect.duration_policy == enum.EDurationPolicy.HasDuration then
         effect.remaining = resolve(effect_def.duration, effect)
     end
@@ -535,21 +515,6 @@ function M.remove_effect(state, effect_id)
     remove_granted_tags(state, effect.granted_tags or {}, key)
     state.effects[key] = nil
     event_mod.dispatch_event(state, enum.EGameplayEvent.EffectRemoved, { effect_id = effect_id })
-end
-
----设置效果等级
----@param state mini_gas.EntityState
----@param effect_id mini_gas.EffectId
----@param level number
-function M.set_effect_level(state, effect_id, level)
-    local key = effect_key(effect_id)
-    local effect = state.effects[key]
-    if effect then
-        effect.level = level
-        for _, mod in ipairs(effect.modifiers) do
-            mod.level = level
-        end
-    end
 end
 
 ---设置效果 Stack

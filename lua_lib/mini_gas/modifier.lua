@@ -10,11 +10,11 @@ M.Modifier = {}
 
 ---创建自包含 Modifier 实例
 ---@param def mini_gas.ModifierDef
----@param level number
 ---@param source any
 ---@param stack number|nil
 ---@return mini_gas.Modifier
-function M.Modifier.new(def, level, source, stack)
+function M.Modifier.new(def, source, stack)
+    ---成长性字段 level 从 source（通常为 GameplayEffect 子类实例）读取
     return {
         attribute = def.attribute,
         op = def.op,
@@ -22,7 +22,7 @@ function M.Modifier.new(def, level, source, stack)
         priority = def.priority,
         require_tags = def.require_tags,
         blocked_tags = def.blocked_tags,
-        level = level or 1,
+        level = source and source.level or 1,
         source = source,
         stack = stack,
     }

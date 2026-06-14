@@ -5,15 +5,15 @@
 
 `mini-gas` 仅依赖 Lua 标准库，不依赖任何外部 GAS 库或第三方库。所有类型、工具函数均在 `lua_lib/mini_gas` 内自包含。
 
-### 3.2 Level / Stack 驱动成长
+### 3.2 Stack 驱动堆叠，子类实现成长
 
-游戏中的英雄、技能、装备、Buff 都具有成长性。`mini-gas` 的成长性由运行时实例的 `level` / `stack` 与配置 `Def` 中的公式函数共同描述：
+`mini-gas` 基类只保留运行时必需字段。`GameplayAbility` / `GameplayEffect` 的 `stack` 字段描述堆叠层数；而等级、成长曲线等由业务子类在 `Def` 中自行携带（如 `level` 字段），实例化时复制到运行时对象。公式函数读取这些子类字段完成数值缩放：
 
 - `AbilityDef.cooldown` / `AbilityDef.cost[attr]`：`fun(self: GameplayAbility): number`
 - `EffectDef.duration` / `EffectDef.period`：`fun(self: GameplayEffect): number`
 - `ModifierDef.value`（Compound）：`fun(self: Modifier, v: number): number`
 
-`MiniASC` 在实例化时将传入的 `level` / `stack` 写入运行时实例，公式函数读取这些字段完成数值计算。
+基类不预定义 `level`，避免把成长模型硬编码进框架。
 
 ### 3.3 无魔术字符串
 
@@ -48,10 +48,10 @@ mindmap
       不依赖外部 GAS 库
       不依赖第三方库
       仅 Lua 标准库
-    Level / Stack 驱动成长
-      GameplayAbility.level/stack
-      GameplayEffect.level/stack
-      Modifier.level/stack
+    Stack 驱动堆叠，子类实现成长
+      GameplayAbility.stack
+      GameplayEffect.stack
+      子类 Def 可携带 level
       按类型公式函数
     无魔术字符串
       idAliasText["alias: string | integer"]
