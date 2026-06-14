@@ -1,5 +1,5 @@
 --- GameplayEffect 运行时实例
---- 实例为自包含普通 Lua 表，不引用外部 Def。
+--- 实例为轻量运行时状态表，通过 `def` 字段引用外部 Def，不复制 Def 字段。
 local enum = require("mini_gas.enum")
 local modifier_mod = require("mini_gas.modifier")
 local tag_mod = require("mini_gas.tag")
@@ -7,28 +7,6 @@ local tag_mod = require("mini_gas.tag")
 local M = {}
 
 M.GameplayEffect = {}
-
----浅拷贝数组
----@param arr any[]|nil
----@return any[]
-local function copy_array(arr)
-    local result = {}
-    for i, v in ipairs(arr or {}) do
-        result[i] = v
-    end
-    return result
-end
-
----浅拷贝普通表（不递归，保留函数引用）
----@param t table|nil
----@return table
-local function shallow_copy(t)
-    local result = {}
-    for k, v in pairs(t or {}) do
-        result[k] = v
-    end
-    return result
-end
 
 ---根据持续策略初始化剩余时间
 ---@param duration_policy mini_gas.EDurationPolicy
@@ -44,19 +22,16 @@ end
 ---@param stack number|nil
 ---@return mini_gas.GameplayEffect
 function M.GameplayEffect.new(def, stack)
-    ---子类可在 def 中携带 level 等成长字段，基类不再自动注入 level
-    local effect = shallow_copy(def)
-    -- 数组字段深拷贝一层，避免运行时修改影响 Def
-    effect.granted_tags = copy_array(def.granted_tags)
-    effect.require_tags = copy_array(def.require_tags)
-    effect.blocked_tags = copy_array(def.blocked_tags)
-    -- 运行时状态字段
+    ---运行时实例仅保留状态字段，配置字段通过 def 引用读取
     stack = stack or def.stack or 1
-    effect.stack = stack
-    effect.elapsed = 0
-    effect.remaining = initial_remaining(def.duration_policy)
-    effect.last_trigger_count = 0
-    effect.modifiers = {}
+    local effect = {
+        def = def,
+        stack = stack,
+        elapsed = 0,
+        remaining = initial_remaining(def.duration_policy),
+        last_trigger_count = 0,
+        modifiers = {},
+    }
     for i, mod_def in ipairs(def.modifiers or {}) do
         effect.modifiers[i] = modifier_mod.Modifier.new(mod_def, effect, stack)
     end
@@ -67,7 +42,7 @@ end
 ---@param effect mini_gas.GameplayEffect
 ---@return number
 function M.period_value(effect)
-    local p = effect.period
+    local p = effect.def.period
     if type(p) == "number" then
         return p
     end
@@ -82,9 +57,10 @@ end
 ---@param effect mini_gas.GameplayEffect
 ---@return boolean
 function M.meets_tag_requirements(state, effect)
+    local def = effect.def
     local container = state.tags
-    local req = effect.require_tags or {}
-    local blocked = effect.blocked_tags or {}
+    local req = def.require_tags or {}
+    local blocked = def.blocked_tags or {}
     return tag_mod.has_all(container, req) and not tag_mod.has_any(container, blocked)
 end
 

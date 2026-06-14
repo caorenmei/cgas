@@ -1,53 +1,10 @@
 --- GameplayAbility 运行时实例
---- 实例为自包含普通 Lua 表，不引用外部 Def。
+--- 实例为轻量运行时状态表，通过 `def` 字段引用外部 Def，不复制 Def 字段。
 local tag_mod = require("mini_gas.tag")
 
 local M = {}
 
 M.GameplayAbility = {}
-
----浅拷贝数组
----@param arr any[]|nil
----@return any[]
-local function copy_array(arr)
-    local result = {}
-    for i, v in ipairs(arr or {}) do
-        result[i] = v
-    end
-    return result
-end
-
----浅拷贝普通表（不递归，保留函数引用）
----@param t table|nil
----@return table
-local function shallow_copy(t)
-    local result = {}
-    for k, v in pairs(t or {}) do
-        result[k] = v
-    end
-    return result
-end
-
----@param def mini_gas.GameplayAbilityDef
----@param stack number|nil
----@return mini_gas.GameplayAbility
-function M.GameplayAbility.new(def, stack)
-    ---子类可在 def 中携带 level 等成长字段，基类不再自动注入 level
-    local ability = shallow_copy(def)
-    -- 数组/table 字段深拷贝一层，避免运行时修改影响 Def
-    ability.cost = shallow_copy(def.cost)
-    ability.require_tags = copy_array(def.require_tags)
-    ability.blocked_tags = copy_array(def.blocked_tags)
-    ability.grant_tags = copy_array(def.grant_tags)
-    ability.effects = copy_array(def.effects)
-    -- 运行时状态字段
-    ability.stack = stack or def.stack or 1
-    ability.is_active = false
-    ability.cooldown_remaining = 0
-    ability.listener = nil
-    ability.spawned_effects = {}
-    return ability
-end
 
 ---解析数值（常量或公式函数）
 ---@param value number | fun(self: mini_gas.GameplayAbility, ...): number
@@ -63,6 +20,21 @@ local function resolve_value(value, self)
     return 0
 end
 
+---@param def mini_gas.GameplayAbilityDef
+---@param stack number|nil
+---@return mini_gas.GameplayAbility
+function M.GameplayAbility.new(def, stack)
+    ---运行时实例仅保留状态字段，配置字段通过 def 引用读取
+    return {
+        def = def,
+        stack = stack or def.stack or 1,
+        is_active = false,
+        cooldown_remaining = 0,
+        listener = nil,
+        spawned_effects = {},
+    }
+end
+
 ---检查当前是否可以激活
 ---@param state mini_gas.EntityState
 ---@param ability mini_gas.GameplayAbility
@@ -76,15 +48,16 @@ function M.can_activate(state, ability, payload)
         return false
     end
 
+    local def = ability.def
     local container = state.tags
-    local req = ability.require_tags or {}
-    local blocked = ability.blocked_tags or {}
+    local req = def.require_tags or {}
+    local blocked = def.blocked_tags or {}
     if not tag_mod.has_all(container, req) or tag_mod.has_any(container, blocked) then
         return false
     end
 
-    if ability.cost then
-        for attr_id, cost_value in pairs(ability.cost) do
+    if def.cost then
+        for attr_id, cost_value in pairs(def.cost) do
             local current = state.attributes[attr_id] or 0
             local need = resolve_value(cost_value, ability)
             if current < need then
@@ -93,8 +66,8 @@ function M.can_activate(state, ability, payload)
         end
     end
 
-    if ability.can_activate then
-        local ok = ability.can_activate(state, payload)
+    if def.can_activate then
+        local ok = def.can_activate(state, payload)
         if ok == false then
             return false
         end
@@ -118,7 +91,7 @@ end
 ---@param ability mini_gas.GameplayAbility
 function M.end_ability(ability)
     ability.is_active = false
-    ability.cooldown_remaining = resolve_value(ability.cooldown or 0, ability)
+    ability.cooldown_remaining = resolve_value(ability.def.cooldown or 0, ability)
 end
 
 M.resolve_value = resolve_value

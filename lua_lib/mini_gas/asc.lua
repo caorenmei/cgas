@@ -112,7 +112,7 @@ local function collect_modifiers(state, attr_id)
     for _, effect in pairs(state.effects) do
         if effect_mod.meets_tag_requirements(state, effect) and effect_mod.period_value(effect) <= 0 then
             for _, mod in ipairs(effect_mod.active_modifiers(effect)) do
-                if mod.attribute == attr_id then
+                if mod.def.attribute == attr_id then
                     mods[#mods + 1] = mod
                 end
             end
@@ -234,19 +234,19 @@ function M.give_ability(state, defs, ability_def, stack)
     local ability = ability_mod.GameplayAbility.new(ability_def, stack)
     state.abilities[key] = ability
 
-    for _, tag in ipairs(ability.grant_tags or {}) do
+    for _, tag in ipairs(ability.def.grant_tags or {}) do
         add_granted_tag(state, tag, key)
     end
 
-    if ability.activation_policy == enum.EAbilityActivationPolicy.Reactive and ability.activation_event then
+    if ability.def.activation_policy == enum.EAbilityActivationPolicy.Reactive and ability.def.activation_event then
         local listener = function(payload)
             M.try_activate_ability(state, defs, ability_def.id, payload)
         end
         ability.listener = listener
-        event_mod.listen_event(state, ability.activation_event, listener)
+        event_mod.listen_event(state, ability.def.activation_event, listener)
     end
 
-    if ability.activation_policy == enum.EAbilityActivationPolicy.Passive then
+    if ability.def.activation_policy == enum.EAbilityActivationPolicy.Passive then
         M.try_activate_ability(state, defs, ability_def.id)
     end
 end
@@ -265,15 +265,15 @@ function M.remove_ability(state, ability_id)
         M.end_ability(state, ability_id)
     end
 
-    if ability.activation_policy == enum.EAbilityActivationPolicy.Reactive and ability.activation_event then
+    if ability.def.activation_policy == enum.EAbilityActivationPolicy.Reactive and ability.def.activation_event then
         local listener = ability.listener
         if listener then
-            event_mod.unlisten_event(state, ability.activation_event, listener)
+            event_mod.unlisten_event(state, ability.def.activation_event, listener)
             ability.listener = nil
         end
     end
 
-    remove_granted_tags(state, ability.grant_tags or {}, key)
+    remove_granted_tags(state, ability.def.grant_tags or {}, key)
 
     -- 仅移除本技能在激活时产生的效果，避免误删业务方独立应用且 source 相同的效果
     for _, effect_id in ipairs(ability.spawned_effects or {}) do
@@ -331,8 +331,8 @@ function M.try_activate_ability(state, defs, ability_id, payload)
         return false
     end
 
-    if ability.cost then
-        for attr_id, cost_value in pairs(ability.cost) do
+    if ability.def.cost then
+        for attr_id, cost_value in pairs(ability.def.cost) do
             local old = state.attributes[attr_id] or 0
             state.attributes[attr_id] = clamp_attr(defs, attr_id, old - resolve(cost_value, ability))
             if old ~= state.attributes[attr_id] then
@@ -341,7 +341,7 @@ function M.try_activate_ability(state, defs, ability_id, payload)
         end
     end
 
-    for _, effect_def in ipairs(ability.effects or {}) do
+    for _, effect_def in ipairs(ability.def.effects or {}) do
         local cloned = {}
         for k, v in pairs(effect_def) do
             cloned[k] = v
@@ -356,7 +356,7 @@ function M.try_activate_ability(state, defs, ability_id, payload)
         payload = payload,
     })
 
-    if ability.activation_policy ~= enum.EAbilityActivationPolicy.Passive then
+    if ability.def.activation_policy ~= enum.EAbilityActivationPolicy.Passive then
         M.end_ability(state, ability_id)
     end
 
@@ -372,16 +372,17 @@ local function apply_instant_modifiers(state, defs, effect)
         if not modifier_mod.is_active(state, mod) then
             goto continue
         end
-        local attr_id = mod.attribute
-        local def = attr_def(defs, attr_id)
-        if not def then
+        local mod_def = mod.def
+        local attr_id = mod_def.attribute
+        local target_attr_def = attr_def(defs, attr_id)
+        if not target_attr_def then
             log_mod.warn("Instant effect 目标 attribute 不存在: " .. tostring(attr_id))
             goto continue
         end
         local old = state.attributes[attr_id] or 0
         local new_value
-        local val = mod.value
-        if mod.op == enum.EModifierOp.Compound then
+        local val = mod_def.value
+        if mod_def.op == enum.EModifierOp.Compound then
             if type(val) == "function" then
                 new_value = val(mod, old)
             else
@@ -394,14 +395,14 @@ local function apply_instant_modifiers(state, defs, effect)
                 goto continue
             end
             ---@cast val number
-            if mod.op == enum.EModifierOp.Add then
+            if mod_def.op == enum.EModifierOp.Add then
                 new_value = old + val
-            elseif mod.op == enum.EModifierOp.Multiply then
+            elseif mod_def.op == enum.EModifierOp.Multiply then
                 new_value = old * val
-            elseif mod.op == enum.EModifierOp.Override then
+            elseif mod_def.op == enum.EModifierOp.Override then
                 new_value = val
             else
-                log_mod.warn("Instant effect 遇到未知 Modifier 操作: " .. tostring(mod.op))
+                log_mod.warn("Instant effect 遇到未知 Modifier 操作: " .. tostring(mod_def.op))
                 goto continue
             end
         end
@@ -421,7 +422,7 @@ end
 local function apply_periodic_modifiers(state, defs, effect, count)
     local groups = {}
     for _, mod in ipairs(effect_mod.active_modifiers(effect)) do
-        local id = mod.attribute
+        local id = mod.def.attribute
         groups[id] = groups[id] or {}
         local g = groups[id]
         g[#g + 1] = mod
@@ -482,11 +483,11 @@ function M.apply_effect(state, defs, effect_def, stack)
     end
 
     local effect = effect_mod.GameplayEffect.new(effect_def, stack)
-    if effect.duration_policy == enum.EDurationPolicy.HasDuration then
+    if effect.def.duration_policy == enum.EDurationPolicy.HasDuration then
         effect.remaining = resolve(effect_def.duration, effect)
     end
 
-    if effect.duration_policy == enum.EDurationPolicy.Instant then
+    if effect.def.duration_policy == enum.EDurationPolicy.Instant then
         if effect_mod.meets_tag_requirements(state, effect) then
             apply_instant_modifiers(state, defs, effect)
         end
@@ -494,7 +495,7 @@ function M.apply_effect(state, defs, effect_def, stack)
         return
     end
 
-    for _, tag in ipairs(effect.granted_tags or {}) do
+    for _, tag in ipairs(effect.def.granted_tags or {}) do
         add_granted_tag(state, tag, key)
     end
 
@@ -512,7 +513,7 @@ function M.remove_effect(state, effect_id)
         return
     end
 
-    remove_granted_tags(state, effect.granted_tags or {}, key)
+    remove_granted_tags(state, effect.def.granted_tags or {}, key)
     state.effects[key] = nil
     event_mod.dispatch_event(state, enum.EGameplayEvent.EffectRemoved, { effect_id = effect_id })
 end
@@ -540,7 +541,7 @@ end
 ---@return boolean 是否仍然存活
 local function update_effect(state, defs, effect, dt)
     if not effect_mod.meets_tag_requirements(state, effect) then
-        if effect.duration_policy == enum.EDurationPolicy.HasDuration then
+        if effect.def.duration_policy == enum.EDurationPolicy.HasDuration then
             effect.remaining = effect.remaining - dt
             if effect.remaining <= 0 then
                 return false
@@ -559,7 +560,7 @@ local function update_effect(state, defs, effect, dt)
         end
     end
 
-    if effect.duration_policy == enum.EDurationPolicy.HasDuration then
+    if effect.def.duration_policy == enum.EDurationPolicy.HasDuration then
         effect.remaining = effect.remaining - dt
         if effect.remaining <= 0 then
             return false
@@ -583,7 +584,7 @@ function M.update(state, defs, dt)
     for _, key in ipairs(expired) do
         local effect = state.effects[key]
         if effect then
-            M.remove_effect(state, effect.id)
+            M.remove_effect(state, effect.def.id)
         end
     end
 

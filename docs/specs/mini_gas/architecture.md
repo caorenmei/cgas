@@ -30,11 +30,11 @@
 
 业务代码禁止直接书写 `"attr.max_hp"`、`"Add"`、`"ability.attack"` 等字面量。业务 ID 应由策划配置并通过 `ConfigAdapter` 映射到项目级 `@enum`。
 
-### 3.4 状态完全自包含
+### 3.4 运行时状态轻量、Def 外置
 
-`mini-gas` 的运行时状态对象（`EntityState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask`）均为无元表的普通 Lua 表，且**不引用任何外部对象**（包括配置 Def、下划线查找表、其他运行时实例）。运行时数据在创建时即复制完整的 Def 信息，可直接序列化、持久化与网络同步。
+`mini-gas` 的运行时状态对象（`EntityState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask`）均为无元表的普通 Lua 表。`GameplayAbility` / `GameplayEffect` / `Modifier` 的运行时实例通过 `def` 字段引用外部 Def，不复制配置字段；需要 `require_tags`、数值公式等字段时，通过 `def` 读取。
 
-配置定义集中存放在 `Defs` 表中，由调用方持有，并在需要的 API 调用中传入。
+配置定义集中存放在 `Defs` 表中，由调用方持有，并在需要的 API 调用中传入。若业务需要完全自包含的快照，可在序列化前将 Def 数据合并到实例中。
 
 ### 3.5 事件驱动
 

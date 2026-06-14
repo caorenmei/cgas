@@ -125,13 +125,8 @@ function tag_mod.matches(a, b) end
 ---@field blocked_tags? mini_gas.TagId[]
 
 ---@class mini_gas.Modifier
----@field attribute mini_gas.AttributeId
----@field op mini_gas.EModifierOp
----@field value number | fun(self: mini_gas.Modifier, v: number): number
----@field priority? number
----@field require_tags? mini_gas.TagId[]
----@field blocked_tags? mini_gas.TagId[]
----@field level number
+---运行时实例通过 def 引用外部 ModifierDef，不复制字段
+---@field def mini_gas.ModifierDef
 ---@field source any
 ---@field stack? number
 ```
@@ -151,7 +146,7 @@ function modifier_mod.is_active(state, mod) end
 
 #### 5.3.5 效果
 
-`EffectDef` 是静态配置；`GameplayEffect` 实例是**自包含**的运行时数据，保存完整的 Effect 配置与运行时字段，并在创建时把 `ModifierDef[]` 转换为 `Modifier[]`。
+`EffectDef` 是静态配置；`GameplayEffect` 实例是轻量运行时状态表，通过 `def` 引用外部 EffectDef，并在创建时把 `ModifierDef[]` 转换为轻量的 `Modifier[]`。
 
 `duration` / `period` 支持常量或公式函数 `fun(self: GameplayEffect, ...): number`。
 
@@ -171,22 +166,13 @@ function modifier_mod.is_active(state, mod) end
 ---@field source any
 
 ---@class mini_gas.GameplayEffect
----@field id mini_gas.EffectId
----@field alias? string|integer
----@field duration_policy mini_gas.EDurationPolicy
----@field duration? number | fun(self: mini_gas.GameplayEffect, ...): number
----@field period? number | fun(self: mini_gas.GameplayEffect, ...): number
----@field modifiers mini_gas.Modifier[]
----@field stacking? mini_gas.EStackingPolicy
----@field max_stack? number
----@field granted_tags? mini_gas.TagId[]
----@field require_tags? mini_gas.TagId[]
----@field blocked_tags? mini_gas.TagId[]
----@field source any
+---运行时实例通过 def 引用外部 EffectDef，不复制字段
+---@field def mini_gas.EffectDef
 ---@field stack number
 ---@field elapsed number
 ---@field remaining number
 ---@field last_trigger_count number
+---@field modifiers mini_gas.Modifier[]
 ```
 
 效果操作：
@@ -208,7 +194,7 @@ function effect_mod.period_value(effect) end
 
 #### 5.3.6 技能
 
-`GameplayAbilityDef` 是静态配置；`GameplayAbility` 实例是**自包含**的运行时数据，保存完整的 Ability 配置与运行时字段。
+`GameplayAbilityDef` 是静态配置；`GameplayAbility` 实例是轻量运行时状态表，通过 `def` 引用外部 AbilityDef。
 
 `cooldown` / `cost[attr]` 支持常量或公式函数 `fun(self: GameplayAbility, ...): number`。
 
@@ -228,22 +214,13 @@ function effect_mod.period_value(effect) end
 ---@field source any
 
 ---@class mini_gas.GameplayAbility
----@field id mini_gas.AbilityId
----@field alias? string|integer
----@field activation_policy mini_gas.EAbilityActivationPolicy
----@field cooldown? number | fun(self: mini_gas.GameplayAbility, ...): number
----@field cost? table<mini_gas.AttributeId, number | fun(self: mini_gas.GameplayAbility, ...): number>
----@field require_tags? mini_gas.TagId[]
----@field blocked_tags? mini_gas.TagId[]
----@field grant_tags? mini_gas.TagId[]
----@field activation_event? mini_gas.GameplayEventId
----@field effects? mini_gas.EffectDef[]
----@field can_activate? fun(state: mini_gas.EntityState, payload: table?): boolean?
----@field source any
+---运行时实例通过 def 引用外部 AbilityDef，不复制字段
+---@field def mini_gas.GameplayAbilityDef
 ---@field stack number
 ---@field is_active boolean
 ---@field cooldown_remaining number
 ---@field listener? fun(payload:table?)
+---@field spawned_effects mini_gas.EffectId[]
 ```
 
 技能操作：

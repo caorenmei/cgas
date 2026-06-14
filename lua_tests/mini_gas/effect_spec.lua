@@ -170,7 +170,7 @@ describe("mini_gas effect", function()
             duration_policy = EDurationPolicy.Infinite,
             level = 4,
             modifiers = {
-                { attribute = EAttribute.Attack, op = EModifierOp.Compound, value = function(mod, v) return v + mod.level * 10 end },
+                { attribute = EAttribute.Attack, op = EModifierOp.Compound, value = function(mod, v) return v + mod.source.def.level * 10 end },
             },
         }
         MiniASC.apply_effect(state, defs, leveled_buff_def)
