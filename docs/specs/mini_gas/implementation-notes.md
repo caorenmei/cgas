@@ -17,7 +17,7 @@
 14. **按类型公式函数**：不定义通用 `GrowthCurve`。`AbilityDef.cooldown/cost`、`EffectDef.duration/period`、`ModifierDef.value`（Compound）分别使用 `fun(self: GameplayAbility, ...)`、`fun(self: GameplayEffect, ...)`、`fun(self: Modifier, v: number)` 签名。
 15. **属性成长外置**：`AttributeDef` 不定义公式，属性 Base 值与成长由外部系统负责。
 16. **标签驱动加成**：优先通过 `Granted Tag` 与 `Require / Block Tag` 实现效果的赋予与条件生效，避免引入额外的跨实体链接机制。
-17. **配置与状态无元表**：所有配置对象（Def）、运行时状态（EntityState / WorldState）以及运行时数据对象（Modifier / GameplayEffect / GameplayAbility / GameplayTagContainer / GameplayTask）的实例均使用无元表的普通 Lua 表。`GameplayAbility` / `GameplayEffect` / `Modifier` 的运行时实例通过 `def` 字段引用外部 Def，需要配置字段时通过 `def` 读取；相关操作通过对应模块的函数完成。运行时属性值仅存储为 `EntityState.attributes` 中的普通数字，不再使用 Attribute 对象。
+17. **配置与状态无元表**：所有配置对象（Def）、运行时状态（EntityState / WorldState）以及运行时数据对象（Modifier / GameplayEffect / GameplayAbility / GameplayTagContainer / GameplayTask）的实例均使用无元表的普通 Lua 表。`GameplayAbility` / `GameplayEffect` 的运行时实例保留运行时生成的 `id`（实例 ID）与 `def_id`（配置 ID），通过 `def_id` 从 `Defs` 表查找配置；`Modifier` 实例包含于 `GameplayEffect` 中，仅保留 `def_id`、`index` 与 `stack`。运行时属性值仅存储为 `EntityState.attributes` 中的普通数字，不再使用 Attribute 对象。
 18. **类型与枚举分离**：LuaCATS 类型定义集中于 `types.lua`；枚举定义使用 `---@enum` 注解，集中定义于 `enum.lua`。业务与框架模块通过引用这些类型获得静态检查。
 
 ---
@@ -27,7 +27,7 @@
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v1.0 | 2026-06-14 | 初始版本，仅包含 Attribute / Modifier / Effect / Context |
-| v2.0 | 2026-06-14 | 重构为独立 GAS 核心；新增 Ability / Tag；目录调整为 `lua_lib/mini_gas`；业务 ID 由策划 alias（`string \| integer`）配置；`MiniASC` 改为无状态函数集合，状态由 `EntityState` / `WorldState` 外置；运行时实例自包含完整 Def 数据；配置定义由 `Defs` 持有并传入；效果通过 Granted / Require / Block Tag 驱动 |
+| v2.0 | 2026-06-14 | 重构为独立 GAS 核心；新增 Ability / Tag；目录调整为 `lua_lib/mini_gas`；业务 ID 由策划 alias（`string \| integer`）配置；`MiniASC` 改为无状态函数集合，状态由 `EntityState` / `WorldState` 外置；运行时实例保留实例 `id` 与 `def_id`，通过 `Defs` 查找配置；`Modifier` 包含于 `GameplayEffect` 中；配置定义由 `Defs` 持有并传入；效果通过 Granted / Require / Block Tag 驱动 |
 
 ---
 
