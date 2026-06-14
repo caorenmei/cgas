@@ -37,6 +37,7 @@ cgas/
   - 主工作区保持 `main` 分支。
   - 各 worktree 独立运行，互不干扰。
   - worktree 目录统一放在 `.worktrees/` 下。
+  - `.worktreeinclude` 列出创建 worktree 时需要拷贝的本地环境文件（如 `lua_modules`、`.luarocks`、`lua`、`luarocks`），确保各 worktree 拥有独立可运行的环境。
 
 - **TDD**：新功能、Bug 修复、重构均遵循红-绿-重构循环。先写失败的测试，再写最小实现使其通过，最后重构。
 - **静态诊断**：提交前运行 `lua-language-server --check . --configpath .luarc.json`，要求输出 `Diagnosis completed, no problems found`，即零错误、零警告。任何 `Error` 或 `Warning` 都必须修复后才能提交。
