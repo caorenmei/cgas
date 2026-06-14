@@ -57,6 +57,7 @@ end
 ---@field period_timer number
 ---@field stack_count integer
 ---@field is_active boolean
+---@field removed_original_tags cgas.semantics.GameplayTagContainer?
 local ActiveGameplayEffect = {}
 ActiveGameplayEffect.__index = ActiveGameplayEffect
 M.ActiveGameplayEffect = ActiveGameplayEffect
@@ -79,15 +80,15 @@ function ActiveGameplayEffect.new(opts)
     return self
 end
 
----应用即时效果（不进入激活列表）
+---应用即时效果：永久修改目标属性的 base_value
 function ActiveGameplayEffect:apply_instant()
     if self.effect.duration_policy ~= "instant" then
         return
     end
-    self:_apply_modifiers()
+    self:apply_modifiers_to_base(self.target_set, self.source_set)
 end
 
----进入激活状态并应用效果
+---进入激活状态（duration / infinite），不直接修改属性
 function ActiveGameplayEffect:on_apply()
     self.is_active = true
     self.start_time = 0
@@ -101,15 +102,6 @@ function ActiveGameplayEffect:on_apply()
 
     if self.effect.stacking_policy then
         self.stack_count = self.stack_count + 1
-    end
-
-    if self.effect.duration_policy == "duration" or self.effect.duration_policy == "infinite" then
-        -- 对于 periodic_instant 效果，不在 on_apply 中应用，由周期触发处理
-        if not self.effect.periodic_instant then
-            self:_apply_modifiers()
-        end
-    elseif self.effect.duration_policy == "instant" then
-        self:_apply_modifiers()
     end
 end
 
@@ -126,11 +118,11 @@ function ActiveGameplayEffect:update(dt)
     if self.effect.period and self.effect.period > 0 then
         self.period_timer = self.period_timer + dt
 
-        -- 对于 periodic_instant，使用 ceil(dt/period) 计算触发次数
+        -- 对于 periodic_instant，每次周期到达永久修改 base_value
         if self.effect.periodic_instant then
             local times = math.ceil(dt / self.effect.period)
             for _ = 1, times do
-                self:_apply_modifiers()
+                self:apply_modifiers_to_base(self.target_set, self.source_set)
             end
             while self.period_timer >= self.effect.period do
                 self.period_timer = self.period_timer - self.effect.period
@@ -140,9 +132,6 @@ function ActiveGameplayEffect:update(dt)
 
         while self.period_timer >= self.effect.period do
             self.period_timer = self.period_timer - self.effect.period
-            if self.effect.periodic_instant then
-                self:_apply_modifiers()
-            end
         end
     end
 end
@@ -166,30 +155,59 @@ function ActiveGameplayEffect:is_stack_at_limit()
     return self.stack_count >= limit
 end
 
----内部：应用修饰器到目标属性集
-function ActiveGameplayEffect:_apply_modifiers()
-    if not self.target_set then
+---内部：将修饰器永久应用到目标属性的 base_value（用于 instant / periodic_instant）
+---@param target_set cgas.semantics.AttributeSet?
+---@param source_set cgas.semantics.AttributeSet?
+function ActiveGameplayEffect:apply_modifiers_to_base(target_set, source_set)
+    if not target_set then
         return
     end
     for _, mod in ipairs(self.effect.modifiers) do
         local attr_name = mod.attribute_name:match("[^%.]+$") or mod.attribute_name
-        local attribute = self.target_set:get(attr_name)
+        local attribute = target_set:get(attr_name)
         if attribute then
             local magnitude = mod.magnitude
             if type(magnitude) == "table" then
-                magnitude = M.resolve_magnitude(magnitude, self.level, self.source_set, self.target_set)
+                magnitude = M.resolve_magnitude(magnitude, self.level, source_set, target_set)
             end
+            local new_base = attribute.base_value
             if mod.op == "add" then
-                attribute.current_value = attribute.current_value + magnitude
+                new_base = new_base + magnitude
             elseif mod.op == "multiply" then
-                attribute.current_value = attribute.current_value * magnitude
+                new_base = new_base * magnitude
             elseif mod.op == "divide" then
-                attribute.current_value = attribute.current_value / magnitude
+                new_base = new_base / magnitude
             elseif mod.op == "override" then
-                attribute.current_value = magnitude
+                new_base = magnitude
             end
+            attribute:set_base(new_base)
         end
     end
+end
+
+---收集当前 ActiveEffect 提供的生效 modifiers（用于 duration / infinite 重算）
+---@return cgas.semantics.Modifier[]
+function ActiveGameplayEffect:collect_modifiers()
+    if self.effect.duration_policy == "instant" then
+        return {}
+    end
+    if self.effect.periodic_instant then
+        return {}
+    end
+    local result = {}
+    for _, mod in ipairs(self.effect.modifiers) do
+        local magnitude = mod.magnitude
+        if type(magnitude) == "table" then
+            magnitude = M.resolve_magnitude(magnitude, self.level, self.source_set, self.target_set)
+        end
+        table.insert(result, {
+            attribute_name = mod.attribute_name,
+            op = mod.op,
+            magnitude = magnitude,
+            source_handle = self.handle,
+        })
+    end
+    return result
 end
 
 M.resolve_magnitude = function(magnitude, level, source_set, target_set)
