@@ -8,6 +8,8 @@
 
 ```
 cgas/
+├── .kimi-code/              # Kimi Code 项目级配置与 Agent skill
+│   └── skills/              # Agent skill 目录
 ├── docs/                    # 项目文档
 │   ├── books/               # 第三方库中文文档
 │   └── specs/               # 功能规格说明
@@ -30,6 +32,7 @@ cgas/
 - **busted** — 单元测试框架
 - **lua-lsp** — Lua 语言服务器（`.luarc.json`），提供代码补全、诊断、格式化、类型注释等功能，类型注释参考 @docs/books/LuaCATS-annotations.md
 - **便利脚本**：`./lua`（带本地路径的 REPL）、`./luarocks`（本地依赖管理）
+- **Kimi Code**：项目级 skill 放在 `.kimi-code/skills/` 下，并通过 `~/.kimi-code/config.toml` 的 `extra_skill_dirs` 指向该目录，使 Kimi Code 会话可加载项目 skill。
 
 ## 开发工作流
 
