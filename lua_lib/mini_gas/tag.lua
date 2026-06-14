@@ -1,8 +1,7 @@
 --- GameplayTag 与 GameplayTagContainer
+--- 类型定义见 mini_gas.types
 local M = {}
 
----@class mini_gas.GameplayTag
----@field name string 标签完整名称
 local GameplayTag = {}
 GameplayTag.__index = GameplayTag
 
@@ -34,9 +33,6 @@ function GameplayTag:matches(other)
     return tag_matches(self.name, other.name)
 end
 
----@class mini_gas.GameplayTagContainer
----@field tags table<string, mini_gas.GameplayTag>
----@field counts table<string, table<string, number>> 按来源引用计数
 local GameplayTagContainer = {}
 GameplayTagContainer.__index = GameplayTagContainer
 

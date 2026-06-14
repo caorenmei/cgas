@@ -1,17 +1,9 @@
 --- GameplayTask 轻量异步任务
+--- 类型定义见 mini_gas.types
 local event_mod = require("mini_gas.event")
 
 local M = {}
 
----@class mini_gas.GameplayTask
----@field kind "delay"|"periodic"|"wait_event"
----@field remaining number
----@field interval number
----@field event mini_gas.GameplayEventId|nil
----@field callback fun(payload:table|nil)|fun(dt:number)|nil
----@field repeat_count number|nil 剩余重复次数，nil 表示无限
----@field completed boolean
----@field _listener fun(payload:table|nil)|nil
 local GameplayTask = {}
 GameplayTask.__index = GameplayTask
 

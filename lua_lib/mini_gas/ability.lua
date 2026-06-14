@@ -1,26 +1,7 @@
 --- GameplayAbility 与 AbilitySpec
+--- 类型定义见 mini_gas.types
 local M = {}
 
----@class mini_gas.GameplayAbilityDef
----@field id mini_gas.AbilityId
----@field alias string|integer|nil 策划配置原始 ID；nil 时使用 id 的枚举值
----@field activation_policy mini_gas.EAbilityActivationPolicy
----@field cooldown number|mini_gas.GrowthCurve|nil
----@field cost table<mini_gas.AttributeId, number|mini_gas.GrowthCurve>|nil
----@field require_tags mini_gas.TagId[]|nil
----@field forbid_tags mini_gas.TagId[]|nil
----@field grant_tags mini_gas.TagId[]|nil
----@field activation_event mini_gas.GameplayEventId|nil  Reactive 时使用
----@field effects mini_gas.EffectDef[]|nil 激活时自动应用的效果
----@field source any
----@field can_activate? fun(state: mini_gas.EntityState, payload: table|nil): boolean|nil 业务自定义回调
-
----@class mini_gas.GameplayAbility
----@field spec mini_gas.GameplayAbilityDef
----@field level number
----@field stack number
----@field is_active boolean
----@field cooldown_remaining number
 local GameplayAbility = {}
 GameplayAbility.__index = GameplayAbility
 

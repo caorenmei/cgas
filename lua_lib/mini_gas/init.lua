@@ -1,4 +1,5 @@
 --- mini-gas v2.0 模块入口
+--- 类型定义集中管理于 mini_gas.types
 local enum = require("mini_gas.enum")
 local spec = require("mini_gas.spec")
 local tag = require("mini_gas.tag")
@@ -10,10 +11,7 @@ local task = require("mini_gas.task")
 local state = require("mini_gas.state")
 local asc = require("mini_gas.asc")
 
----@class mini_gas
 local M = {}
-
----@alias mini_gas.ConfigAdapter fun(raw_config: any): mini_gas.GameplayAbilityDef|mini_gas.EffectDef|mini_gas.AttributeDef
 
 -- 枚举
 M.EModifierOp = enum.EModifierOp
@@ -26,8 +24,7 @@ M.EAbilityId = enum.EAbilityId
 M.EEffectId = enum.EEffectId
 M.EGameplayEvent = enum.EGameplayEvent
 
--- 类型
-M.GrowthCurve = spec.GrowthCurve
+-- 类型构造器
 M.AbilitySpec = spec.AbilitySpec
 M.EffectSpec = spec.EffectSpec
 M.AttributeSpec = spec.AttributeSpec

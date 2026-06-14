@@ -1,30 +1,10 @@
 --- GameplayEffect 与 EffectDef
+--- 类型定义见 mini_gas.types
 local enum = require("mini_gas.enum")
 local modifier_mod = require("mini_gas.modifier")
 
 local M = {}
 
----@class mini_gas.EffectDef
----@field id mini_gas.EffectId
----@field alias string|integer|nil 策划配置原始 ID；nil 时使用 id 的枚举值
----@field duration_policy mini_gas.EDurationPolicy
----@field duration number|mini_gas.GrowthCurve|nil 单位：秒
----@field period number|mini_gas.GrowthCurve|nil 单位：秒
----@field modifiers mini_gas.ModifierDef[]
----@field stacking mini_gas.EStackingPolicy|nil
----@field max_stack number|nil
----@field granted_tags mini_gas.TagId[]|nil
----@field require_tags mini_gas.TagId[]|nil
----@field forbid_tags mini_gas.TagId[]|nil
----@field source any
-
----@class mini_gas.GameplayEffect
----@field spec mini_gas.EffectDef
----@field level number
----@field stack number
----@field elapsed number
----@field remaining number
----@field last_trigger_count number
 local GameplayEffect = {}
 GameplayEffect.__index = GameplayEffect
 

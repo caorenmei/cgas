@@ -524,7 +524,7 @@ function GameplayAbility:end_ability(state) end
 
 #### 5.2.12 实体状态
 
-`EntityState` 是纯 Lua 表，由业务方创建并持有，便于序列化与持久化。`mini-gas` 库本身不维护任何状态，所有状态均通过 `EntityState` 参数传递。
+`EntityState` 是无元表的纯 Lua 表，由业务方创建并持有，便于序列化与持久化。`mini-gas` 库本身不维护任何状态，所有状态均通过 `EntityState` 参数传递。
 
 ```lua
 ---@class mini_gas.EntityState
@@ -543,7 +543,7 @@ function EntityState.new() end
 
 #### 5.2.13 世界状态
 
-`WorldState` 是 `table<EntityId, EntityState>`，由业务方创建并持有，用于管理多个实体状态，便于批量更新与统一序列化。`mini-gas` 不通过 `WorldState` 维护跨实体链接，实体间的相互影响仍通过 **Tag** 与共享的 `EntityState` 实现。
+`WorldState` 是无元表的 `table<EntityId, EntityState>`，由业务方创建并持有，用于管理多个实体状态，便于批量更新与统一序列化。`mini-gas` 不通过 `WorldState` 维护跨实体链接，实体间的相互影响仍通过 **Tag** 与共享的 `EntityState` 实现。
 
 ```lua
 ---@class mini_gas.WorldState
@@ -1084,6 +1084,7 @@ local saved = json.encode(state)
 lua_lib/
 └── mini_gas/                      -- 独立目录
     ├── init.lua                   -- 模块入口，导出所有公共 API
+    ├── types.lua                  -- LuaCATS 类型定义集中文件
     ├── state.lua                  -- EntityState / WorldState
     ├── asc.lua                    -- MiniASC 无状态函数集合
     ├── ability.lua                -- GameplayAbility 与 AbilitySpec
@@ -1195,6 +1196,8 @@ function mini_gas.make_growth_curve(base, params, formula) end
 11. **策划 Alias 映射**：所有业务 ID（属性、标签、技能、效果、事件）的 `alias` 类型为 `string | integer`，由策划配置并通过 `ConfigAdapter` 映射到项目级 `@enum`；框架层不硬编码业务常量。
 12. **公式化成长**：`GrowthCurve` 必须基于公式计算，禁止等级查表；公式由业务方提供，支持线性、指数、对数、分段等任意形式。
 13. **标签驱动加成**：优先通过 `Granted Tag` 与 `Require / Block Tag` 实现效果的赋予与条件生效，避免引入额外的跨实体链接机制。
+14. **配置与状态无元表**：所有配置对象（Spec / Def / GrowthCurve）与运行时状态（EntityState / WorldState）均使用无元表的普通 Lua 表，便于外部配置桥接、序列化与持久化；MiniGas 内部运行时对象（Attribute / Modifier / GameplayEffect / GameplayAbility / GameplayTag / GameplayTask）可使用元表简化实现。
+15. **类型集中定义**：所有 LuaCATS 类型定义集中于 `types.lua`，业务与框架模块通过引用这些类型获得静态检查。
 
 ---
 

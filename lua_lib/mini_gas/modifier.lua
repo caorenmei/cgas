@@ -1,21 +1,9 @@
 --- Modifier 与属性聚合逻辑
+--- 类型定义见 mini_gas.types
 local enum = require("mini_gas.enum")
 
 local M = {}
 
----@class mini_gas.ModifierDef
----@field attribute mini_gas.AttributeId
----@field op mini_gas.EModifierOp
----@field value number|mini_gas.GrowthCurve|fun(v: number): number
----@field priority number|nil 仅 Override/Compound 时使用
----@field require_tags mini_gas.TagId[]|nil 该 Modifier 生效所需的标签
----@field forbid_tags mini_gas.TagId[]|nil 该 Modifier 生效所禁止的标签
-
----@class mini_gas.Modifier
----@field def mini_gas.ModifierDef
----@field level number
----@field source any
----@field stack number|nil
 local Modifier = {}
 Modifier.__index = Modifier
 

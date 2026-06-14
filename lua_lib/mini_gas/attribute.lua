@@ -1,20 +1,7 @@
 --- Attribute 与 AttributeSet
+--- 类型定义见 mini_gas.types
 local M = {}
 
----@class mini_gas.AttributeDef
----@field name mini_gas.AttributeId
----@field alias string|integer|nil 策划配置原始 ID；nil 时使用 name 的枚举值
----@field base number
----@field min number|nil
----@field max number|nil
----@field growth mini_gas.GrowthCurve|nil
-
----@class mini_gas.Attribute
----@field name mini_gas.AttributeId
----@field base number 基础值（受成长曲线影响）
----@field current number 当前值
----@field min number|nil
----@field max number|nil
 local Attribute = {}
 Attribute.__index = Attribute
 
@@ -52,8 +39,6 @@ function Attribute:get_current()
     return self.current
 end
 
----@class mini_gas.AttributeSet
----@field attributes table<mini_gas.AttributeId, mini_gas.Attribute>
 local AttributeSet = {}
 AttributeSet.__index = AttributeSet
 
