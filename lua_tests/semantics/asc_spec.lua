@@ -1,6 +1,7 @@
 require("lua_tests.support.env")
 local asc = require("cgas.semantics.asc")
 local effect = require("cgas.semantics.effect")
+local tag = require("cgas.semantics.tag")
 
 describe("cgas.semantics.asc", function()
     local function new_asc()
@@ -91,5 +92,54 @@ describe("cgas.semantics.asc", function()
         local h = a:give_ability({ name = "Fireball" })
         a:destroy()
         assert.is_nil(a.granted_abilities[h])
+    end)
+
+    it("restores removed tags only when they were originally present", function()
+        local a = new_asc()
+        local blocked_tag = tag.GameplayTag.new("state.blocked")
+        a:add_tag(blocked_tag)
+        assert.is_true(a.owned_tags:has(blocked_tag))
+
+        local Silence = effect.GameplayEffect.new({
+            name = "Silence",
+            duration_policy = "duration",
+            duration = { type = "scalable_float", value = 2.0 },
+            removed_tags = (function()
+                local c = tag.GameplayTagContainer.new()
+                c:add(blocked_tag)
+                return c
+            end)(),
+        })
+        local h, err = a:apply_effect({ effect_class = Silence })
+        assert.is_nil(err)
+        ---@cast h integer
+        assert.is_false(a.owned_tags:has(blocked_tag))
+
+        assert.is_true(a:remove_active_effect(h))
+        assert.is_true(a.owned_tags:has(blocked_tag))
+    end)
+
+    it("does not add removed tags back if they were not originally present", function()
+        local a = new_asc()
+        local blocked_tag = tag.GameplayTag.new("state.blocked")
+        assert.is_false(a.owned_tags:has(blocked_tag))
+
+        local Silence = effect.GameplayEffect.new({
+            name = "Silence",
+            duration_policy = "duration",
+            duration = { type = "scalable_float", value = 2.0 },
+            removed_tags = (function()
+                local c = tag.GameplayTagContainer.new()
+                c:add(blocked_tag)
+                return c
+            end)(),
+        })
+        local h, err = a:apply_effect({ effect_class = Silence })
+        assert.is_nil(err)
+        ---@cast h integer
+        assert.is_false(a.owned_tags:has(blocked_tag))
+
+        assert.is_true(a:remove_active_effect(h))
+        assert.is_false(a.owned_tags:has(blocked_tag))
     end)
 end)

@@ -55,25 +55,11 @@ end
 ---@field start_time number
 ---@field duration number
 ---@field period_timer number
+---@field stack_count integer
 ---@field is_active boolean
 local ActiveGameplayEffect = {}
 ActiveGameplayEffect.__index = ActiveGameplayEffect
 M.ActiveGameplayEffect = ActiveGameplayEffect
-
-function ActiveGameplayEffect.__index(t, k)
-    if k == "stack_count" then
-        return t.effect._stack_count
-    end
-    return ActiveGameplayEffect[k]
-end
-
-function ActiveGameplayEffect.__newindex(t, k, v)
-    if k == "stack_count" then
-        t.effect._stack_count = v
-    else
-        rawset(t, k, v)
-    end
-end
 
 ---创建 ActiveGameplayEffect 运行时实例
 ---@param opts table
@@ -88,6 +74,7 @@ function ActiveGameplayEffect.new(opts)
     self.start_time = 0
     self.duration = 0
     self.period_timer = 0
+    self.stack_count = 0
     self.is_active = false
     return self
 end
@@ -145,7 +132,6 @@ function ActiveGameplayEffect:update(dt)
             for _ = 1, times do
                 self:_apply_modifiers()
             end
-            self.period_timer = self.period_timer + dt
             while self.period_timer >= self.effect.period do
                 self.period_timer = self.period_timer - self.effect.period
             end
@@ -189,14 +175,18 @@ function ActiveGameplayEffect:_apply_modifiers()
         local attr_name = mod.attribute_name:match("[^%.]+$") or mod.attribute_name
         local attribute = self.target_set:get(attr_name)
         if attribute then
+            local magnitude = mod.magnitude
+            if type(magnitude) == "table" then
+                magnitude = M.resolve_magnitude(magnitude, self.level, self.source_set, self.target_set)
+            end
             if mod.op == "add" then
-                attribute.current_value = attribute.current_value + mod.magnitude
+                attribute.current_value = attribute.current_value + magnitude
             elseif mod.op == "multiply" then
-                attribute.current_value = attribute.current_value * mod.magnitude
+                attribute.current_value = attribute.current_value * magnitude
             elseif mod.op == "divide" then
-                attribute.current_value = attribute.current_value / mod.magnitude
+                attribute.current_value = attribute.current_value / magnitude
             elseif mod.op == "override" then
-                attribute.current_value = mod.magnitude
+                attribute.current_value = magnitude
             end
         end
     end

@@ -85,4 +85,36 @@ describe("cgas.semantics.ability", function()
         ab:cancel_matching_abilities()
         assert.equal("inactive", other.state)
     end)
+
+    it("blocks activation when another active ability blocks its tags", function()
+        local asc = make_asc()
+        local blocker = ability.GameplayAbility.new(asc, {
+            name = "Blocker",
+            ability_tags = function()
+                local c = tag.GameplayTagContainer.new()
+                c:add(tag.GameplayTag.new("ability.channel"))
+                return c
+            end,
+            block_abilities_with_tag = function()
+                local c = tag.GameplayTagContainer.new()
+                c:add(tag.GameplayTag.new("ability.channel"))
+                return c
+            end,
+        })
+        asc.granted_abilities[blocker.handle] = blocker
+        assert.is_true(blocker:activate())
+
+        local blocked = ability.GameplayAbility.new(asc, {
+            name = "Channel",
+            ability_tags = function()
+                local c = tag.GameplayTagContainer.new()
+                c:add(tag.GameplayTag.new("ability.channel"))
+                return c
+            end,
+        })
+        asc.granted_abilities[blocked.handle] = blocked
+        local ok, err = blocked:can_activate()
+        assert.is_false(ok)
+        assert.is_string(err)
+    end)
 end)

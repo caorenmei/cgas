@@ -199,7 +199,11 @@ function ASC:apply_effect(spec)
             end
         end
         if effect.removed_tags then
+            active.removed_original_tags = tag.GameplayTagContainer.new()
             for _, t in pairs(effect.removed_tags.tags) do
+                if self.owned_tags:has(t) then
+                    active.removed_original_tags:add(t)
+                end
                 self:remove_tag(t)
             end
         end
@@ -222,7 +226,11 @@ function ASC:apply_effect(spec)
         end
     end
     if effect.removed_tags then
+        active.removed_original_tags = tag.GameplayTagContainer.new()
         for _, t in pairs(effect.removed_tags.tags) do
+            if self.owned_tags:has(t) then
+                active.removed_original_tags:add(t)
+            end
             self:remove_tag(t)
         end
     end
@@ -268,8 +276,8 @@ function ASC:remove_active_effect(active_effect_handle)
             self:remove_tag(t)
         end
     end
-    if active.effect.removed_tags then
-        for _, t in pairs(active.effect.removed_tags.tags) do
+    if active.removed_original_tags then
+        for _, t in pairs(active.removed_original_tags.tags) do
             self:add_tag(t)
         end
     end

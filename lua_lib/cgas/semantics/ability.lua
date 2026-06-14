@@ -75,6 +75,14 @@ function GameplayAbility:can_activate()
     if self.activation_blocked_tags:matches_any(self.asc.owned_tags) then
         return false, "activation blocked: owns blocked tags"
     end
+    -- Check if any currently active ability blocks this ability's tags.
+    for _, other in pairs(self.asc.granted_abilities or {}) do
+        if other ~= self and other.state == "active" then
+            if self.ability_tags:matches_any(other.block_abilities_with_tag) then
+                return false, "activation blocked by active ability"
+            end
+        end
+    end
     return true, nil
 end
 
