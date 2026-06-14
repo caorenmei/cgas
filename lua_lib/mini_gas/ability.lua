@@ -1,43 +1,71 @@
---- GameplayAbility 与 AbilitySpec
---- GameplayAbility 实例不直接引用 Def，而是通过 spec_id 引用。
+--- GameplayAbility 运行时实例
+--- 实例为自包含普通 Lua 表，不引用外部 Def。
 local tag_mod = require("mini_gas.tag")
 
 local M = {}
 
 M.GameplayAbility = {}
 
----@param spec_id mini_gas.AbilityId
+---浅拷贝数组
+---@param arr any[]|nil
+---@return any[]
+local function copy_array(arr)
+    local result = {}
+    for i, v in ipairs(arr or {}) do
+        result[i] = v
+    end
+    return result
+end
+
+---浅拷贝普通表（不递归，保留函数引用）
+---@param t table|nil
+---@return table
+local function shallow_copy(t)
+    local result = {}
+    for k, v in pairs(t or {}) do
+        result[k] = v
+    end
+    return result
+end
+
+---@param spec mini_gas.GameplayAbilityDef
 ---@param level number
 ---@param stack number|nil
 ---@return mini_gas.GameplayAbility
-function M.GameplayAbility.new(spec_id, level, stack)
+function M.GameplayAbility.new(spec, level, stack)
+    level = level or 1
+    stack = stack or 1
     return {
-        spec_id = spec_id,
-        level = level or 1,
-        stack = stack or 1,
+        id = spec.id,
+        alias = spec.alias,
+        activation_policy = spec.activation_policy,
+        cooldown = spec.cooldown,
+        cost = shallow_copy(spec.cost),
+        require_tags = copy_array(spec.require_tags),
+        blocked_tags = copy_array(spec.blocked_tags),
+        grant_tags = copy_array(spec.grant_tags),
+        activation_event = spec.activation_event,
+        effects = copy_array(spec.effects),
+        can_activate = spec.can_activate,
+        source = spec.source,
+        level = level,
+        stack = stack,
         is_active = false,
         cooldown_remaining = 0,
+        listener = nil,
     }
 end
 
----通过 State 查找 AbilityDef
----@param state mini_gas.EntityState
----@param ability mini_gas.GameplayAbility
----@return mini_gas.GameplayAbilityDef|nil
-local function find_def(state, ability)
-    return state._ability_defs and state._ability_defs[ability.spec_id]
-end
-
----解析数值（常量或成长函数）
----@param value number | mini_gas.GrowthCurve
----@param level number
+---解析数值（常量或公式函数）
+---@param value number | fun(self: mini_gas.GameplayAbility, ...): number
+---@param self mini_gas.GameplayAbility
 ---@return number
-local function resolve_value(value, level)
+local function resolve_value(value, self)
     if type(value) == "number" then
         return value
     end
     if type(value) == "function" then
-        return value(level)
+        return value(self)
     end
     return 0
 end
@@ -54,30 +82,25 @@ function M.can_activate(state, ability)
         return false
     end
 
-    local def = find_def(state, ability)
-    if not def then
-        return false
-    end
-
     local container = state.tags
-    local req = def.require_tags or {}
-    local blocked = def.blocked_tags or {}
+    local req = ability.require_tags or {}
+    local blocked = ability.blocked_tags or {}
     if not tag_mod.has_all(container, req) or tag_mod.has_any(container, blocked) then
         return false
     end
 
-    if def.cost then
-        for attr_id, cost_value in pairs(def.cost) do
+    if ability.cost then
+        for attr_id, cost_value in pairs(ability.cost) do
             local current = state.attributes[attr_id] or 0
-            local need = resolve_value(cost_value, ability.level)
+            local need = resolve_value(cost_value, ability)
             if current < need then
                 return false
             end
         end
     end
 
-    if def.can_activate then
-        local ok = def.can_activate(state, nil)
+    if ability.can_activate then
+        local ok = ability.can_activate(state, nil)
         if ok == false then
             return false
         end
@@ -93,12 +116,10 @@ function M.activate(ability)
 end
 
 ---结束技能
----@param state mini_gas.EntityState
 ---@param ability mini_gas.GameplayAbility
-function M.end_ability(state, ability)
-    local def = find_def(state, ability)
+function M.end_ability(ability)
     ability.is_active = false
-    ability.cooldown_remaining = resolve_value(def and def.cooldown or 0, ability.level)
+    ability.cooldown_remaining = resolve_value(ability.cooldown or 0, ability)
 end
 
 M.resolve_value = resolve_value

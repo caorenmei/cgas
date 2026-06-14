@@ -1,6 +1,7 @@
 require("lua_tests.support.env")
 local mini_gas = require("mini_gas")
 local EntityState = mini_gas.EntityState
+local Defs = mini_gas.Defs
 local MiniASC = mini_gas.MiniASC
 local EModifierOp = mini_gas.EModifierOp
 local EDurationPolicy = mini_gas.EDurationPolicy
@@ -25,43 +26,46 @@ describe("mini_gas effect", function()
 
     it("instant effect modifies current directly", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Hp, base = 100, min = 0, max = 100 },
         })
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.Heal,
             duration_policy = EDurationPolicy.Instant,
             modifiers = {
                 { attribute = EAttribute.Hp, op = EModifierOp.Add, value = -20 },
             },
         }, 1, 1)
-        assert.equal(80, MiniASC.get_current(state, EAttribute.Hp))
+        assert.equal(80, MiniASC.get_current(state, defs, EAttribute.Hp))
     end)
 
     it("infinite effect aggregates until removed", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Attack, base = 100 },
         })
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.BuffAttack,
             duration_policy = EDurationPolicy.Infinite,
             modifiers = {
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 50 },
             },
         }, 1, 1)
-        assert.equal(150, MiniASC.get_current(state, EAttribute.Attack))
+        assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
 
         MiniASC.remove_effect(state, EEffectId.BuffAttack)
-        assert.equal(100, MiniASC.get_current(state, EAttribute.Attack))
+        assert.equal(100, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 
     it("duration effect expires after time", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Attack, base = 100 },
         })
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.BuffAttack,
             duration_policy = EDurationPolicy.HasDuration,
             duration = 2,
@@ -69,21 +73,22 @@ describe("mini_gas effect", function()
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 50 },
             },
         }, 1, 1)
-        assert.equal(150, MiniASC.get_current(state, EAttribute.Attack))
+        assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
 
-        MiniASC.update(state, 1)
-        assert.equal(150, MiniASC.get_current(state, EAttribute.Attack))
+        MiniASC.update(state, defs, 1)
+        assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
 
-        MiniASC.update(state, 1)
-        assert.equal(100, MiniASC.get_current(state, EAttribute.Attack))
+        MiniASC.update(state, defs, 1)
+        assert.equal(100, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 
     it("periodic effect triggers over time", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Gold, base = 0, min = 0 },
         })
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.Dot,
             duration_policy = EDurationPolicy.Infinite,
             period = 1,
@@ -92,13 +97,14 @@ describe("mini_gas effect", function()
             },
         }, 1, 1)
 
-        MiniASC.update(state, 2.5)
-        assert.equal(20, MiniASC.get_current(state, EAttribute.Gold))
+        MiniASC.update(state, defs, 2.5)
+        assert.equal(20, MiniASC.get_current(state, defs, EAttribute.Gold))
     end)
 
     it("stacking Add increases stack", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Attack, base = 100 },
         })
         local def = {
@@ -110,14 +116,15 @@ describe("mini_gas effect", function()
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 10 },
             },
         }
-        MiniASC.apply_effect(state, def, 1, 1)
-        MiniASC.apply_effect(state, def, 1, 2)
-        assert.equal(130, MiniASC.get_current(state, EAttribute.Attack))
+        MiniASC.apply_effect(state, defs, def, 1, 1)
+        MiniASC.apply_effect(state, defs, def, 1, 2)
+        assert.equal(130, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 
     it("stacking Refresh refreshes duration", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Attack, base = 100 },
         })
         local def = {
@@ -129,10 +136,10 @@ describe("mini_gas effect", function()
                 { attribute = EAttribute.Attack, op = EModifierOp.Add, value = 50 },
             },
         }
-        MiniASC.apply_effect(state, def, 1, 1)
-        MiniASC.update(state, 1)
-        MiniASC.apply_effect(state, def, 1, 1)
-        MiniASC.update(state, 1.5)
-        assert.equal(150, MiniASC.get_current(state, EAttribute.Attack))
+        MiniASC.apply_effect(state, defs, def, 1, 1)
+        MiniASC.update(state, defs, 1)
+        MiniASC.apply_effect(state, defs, def, 1, 1)
+        MiniASC.update(state, defs, 1.5)
+        assert.equal(150, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 end)

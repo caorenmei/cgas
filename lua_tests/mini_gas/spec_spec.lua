@@ -2,15 +2,6 @@ require("lua_tests.support.env")
 local mini_gas = require("mini_gas")
 
 describe("mini_gas spec", function()
-    it("growth curve is a formula function", function()
-        local curve = mini_gas.make_growth_curve(function(level)
-            return 100 + (level - 1) * 10
-        end)
-        assert.equal(100, curve(1))
-        assert.equal(110, curve(2))
-        assert.equal(130, curve(4))
-    end)
-
     it("ability spec stores def_id level and stack", function()
         local spec = mini_gas.AbilitySpec.new("ability.test", 3, 2)
         assert.equal("ability.test", spec.def_id)

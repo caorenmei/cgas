@@ -65,7 +65,7 @@ function M.register_task(state, task)
             end
             event_mod.unlisten_event(state, task.event, wrapper)
         end
-        task._listener = wrapper
+        task.listener = wrapper
         event_mod.listen_event(state, task.event, wrapper)
     end
     return task

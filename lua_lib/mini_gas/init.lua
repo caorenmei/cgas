@@ -35,6 +35,7 @@ M.GameplayAbility = ability.GameplayAbility
 M.GameplayTask = task.GameplayTask
 M.EntityState = state.EntityState
 M.WorldState = state.WorldState
+M.Defs = state.Defs
 M.register_entity = state.register_entity
 M.MiniASC = asc
 
@@ -75,13 +76,6 @@ end
 ---@return number
 function M.calc_attribute(base, entity_state, modifiers)
     return modifier.calc_attribute(base, entity_state, modifiers)
-end
-
----创建成长曲线
----@param formula mini_gas.GrowthCurve
----@return mini_gas.GrowthCurve
-function M.make_growth_curve(formula)
-    return spec.make_growth_curve(formula)
 end
 
 return M

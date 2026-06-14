@@ -8,6 +8,7 @@
 ```lua
 local mini_gas = require("mini_gas")
 local EntityState = mini_gas.EntityState
+local Defs = mini_gas.Defs
 local MiniASC = mini_gas.MiniASC
 local EModifierOp = mini_gas.EModifierOp
 local EDurationPolicy = mini_gas.EDurationPolicy
@@ -27,11 +28,12 @@ local EEffectId = {
     VipLevel3 = "effect.vip.level_3",
 }
 
--- 1. 创建实体状态（由业务方持有，可序列化）
+-- 1. 创建状态对象（由业务方持有，可序列化）
 local hero_state = EntityState.new()
+local defs = Defs.new()
 
 -- 2. 注册英雄基础属性
-MiniASC.register_attributes(hero_state, {
+MiniASC.register_attributes(hero_state, defs, {
     { name = EAttribute.MaxHp,    base = 1000, min = 0 },
     { name = EAttribute.Attack,   base = 100,  min = 0 },
     { name = EAttribute.Defense,  base = 50,   min = 0 },
@@ -39,7 +41,7 @@ MiniASC.register_attributes(hero_state, {
 })
 
 -- 3. 装备效果（永久）
-MiniASC.apply_effect(hero_state, {
+MiniASC.apply_effect(hero_state, defs, {
     id = EEffectId.EquipmentSword,
     duration_policy = EDurationPolicy.Infinite,
     modifiers = {
@@ -48,7 +50,7 @@ MiniASC.apply_effect(hero_state, {
 }, 1, 1)
 
 -- 4. VIP 效果（永久）
-MiniASC.apply_effect(hero_state, {
+MiniASC.apply_effect(hero_state, defs, {
     id = EEffectId.VipLevel3,
     duration_policy = EDurationPolicy.Infinite,
     modifiers = {
@@ -57,8 +59,8 @@ MiniASC.apply_effect(hero_state, {
 }, 1, 1)
 
 -- 5. 计算结果
-print(MiniASC.get_current(hero_state, EAttribute.Attack))        -- 150
-print(MiniASC.get_current(hero_state, EAttribute.GoldGainRate))  -- 1.15
+print(MiniASC.get_current(hero_state, defs, EAttribute.Attack))        -- 150
+print(MiniASC.get_current(hero_state, defs, EAttribute.GoldGainRate))  -- 1.15
 
 -- 6. 状态可序列化后保存或网络同步
 local serialized = json.encode(hero_state)
@@ -88,18 +90,18 @@ local EAttribute = {
     Mp = "attr.mp",
 }
 
--- 线性成长公式：value = base + (level - 1) * params.growth
----@type mini_gas.GrowthCurve
-local function linear(level, base, params)
-    return base + (level - 1) * (params and params.growth or 0)
+-- 业务 helper：按等级生成固定数值
+local function calc_by_level(base, growth, level)
+    return base + (level - 1) * growth
 end
 
 local fireball_def = {
     id = EAbilityId.Fireball,
     activation_policy = EAbilityActivationPolicy.Active,
-    cooldown = mini_gas.make_growth_curve(function(level) return linear(level, 5, { growth = -0.2 }) end), -- 每级冷却减少 0.2 秒
+    -- cooldown 是公式函数：self 为 GameplayAbility 实例
+    cooldown = function(self) return calc_by_level(5, -0.2, self.level) end,
     cost = {
-        [EAttribute.Mp] = mini_gas.make_growth_curve(function(level) return linear(level, 20, { growth = 2 }) end),
+        [EAttribute.Mp] = function(self) return calc_by_level(20, 2, self.level) end,
     },
     effects = {
         {
@@ -109,15 +111,15 @@ local fireball_def = {
                 {
                     attribute = EAttribute.Hp,
                     op = EModifierOp.Add,
-                    value = linear(3, -100, { growth = -15 }), -- 3 级时 -130
+                    value = calc_by_level(-100, -15, 3), -- 3 级时 -130
                 },
             },
         },
     },
 }
 
-MiniASC.give_ability(hero_state, fireball_def, 3, 1)
-local ok = MiniASC.try_activate_ability(hero_state, EAbilityId.Fireball)
+MiniASC.give_ability(hero_state, defs, fireball_def, 3, 1)
+local ok = MiniASC.try_activate_ability(hero_state, defs, EAbilityId.Fireball)
 ```
 
 ### 12.3 被动技能：攻击光环
@@ -168,7 +170,7 @@ local attack_aura_def = {
     },
 }
 
-MiniASC.give_ability(hero_state, attack_aura_def, 1, 1)
+MiniASC.give_ability(hero_state, defs, attack_aura_def, 1, 1)
 -- 被动技能自动生效
 ```
 
@@ -224,7 +226,7 @@ local counter_attack_def = {
     },
 }
 
-MiniASC.give_ability(hero_state, counter_attack_def, 1, 1)
+MiniASC.give_ability(hero_state, defs, counter_attack_def, 1, 1)
 -- 当 DamageTaken 事件触发且满足标签条件时，自动尝试激活
 ```
 
@@ -246,11 +248,12 @@ local EEffectId = {
 }
 
 local city_state = EntityState.new()
-MiniASC.register_attributes(city_state, {
+local city_defs = Defs.new()
+MiniASC.register_attributes(city_state, city_defs, {
     { name = EAttribute.IronOutput, base = 0, min = 0 },
 })
 
-MiniASC.apply_effect(city_state, {
+MiniASC.apply_effect(city_state, city_defs, {
     id = EEffectId.BuildingIronMine,
     duration_policy = EDurationPolicy.Infinite,
     period = 60,
@@ -260,9 +263,9 @@ MiniASC.apply_effect(city_state, {
 }, 1, 1)
 
 -- 在游戏主循环中调用
-MiniASC.update(city_state, dt)
+MiniASC.update(city_state, city_defs, dt)
 
-local total_iron = MiniASC.get_current(city_state, EAttribute.IronOutput)
+local total_iron = MiniASC.get_current(city_state, city_defs, EAttribute.IronOutput)
 ```
 
 ### 12.6 综合示例：英雄、装备、宠物、主城与特权相互影响
@@ -280,6 +283,7 @@ local total_iron = MiniASC.get_current(city_state, EAttribute.IronOutput)
 local mini_gas = require("mini_gas")
 local EntityState = mini_gas.EntityState
 local WorldState = mini_gas.WorldState
+local Defs = mini_gas.Defs
 local MiniASC = mini_gas.MiniASC
 local EModifierOp = mini_gas.EModifierOp
 local EDurationPolicy = mini_gas.EDurationPolicy
@@ -322,16 +326,16 @@ local EEffectId = {
     BuildingIronMine = "effect.building.iron_mine",
 }
 
--- 线性成长公式
----@type mini_gas.GrowthCurve
-local function linear(level, base, params)
-    return base + (level - 1) * (params and params.growth or 0)
+-- 业务 helper：按等级生成固定数值
+local function calc_by_level(base, growth, level)
+    return base + (level - 1) * growth
 end
 
--- 所有子系统共享同一个 EntityState
+-- 所有子系统共享同一个 EntityState 与 Defs
 local state = EntityState.new()
+local defs = Defs.new()
 
-MiniASC.register_attributes(state, {
+MiniASC.register_attributes(state, defs, {
     { name = EAttribute.MaxHp,        base = 1000, min = 0 },
     { name = EAttribute.Hp,           base = 1000, min = 0, max = 1000 },
     { name = EAttribute.Mp,           base = 200,  min = 0, max = 200 },
@@ -344,7 +348,7 @@ MiniASC.register_attributes(state, {
 })
 
 -- 装备：传说之剑（永久 + 攻击、+ 防御）
-MiniASC.apply_effect(state, {
+MiniASC.apply_effect(state, defs, {
     id = EEffectId.EquipSword,
     duration_policy = EDurationPolicy.Infinite,
     modifiers = {
@@ -354,17 +358,17 @@ MiniASC.apply_effect(state, {
 }, 1, 1)
 
 -- 宠物：小龙（5 级），Granted pet.active 标签
-MiniASC.apply_effect(state, {
+MiniASC.apply_effect(state, defs, {
     id = EEffectId.PetDragon,
     duration_policy = EDurationPolicy.Infinite,
     granted_tags = { ETag.Pet_Active },
     modifiers = {
-        { attribute = EAttribute.Attack, op = EModifierOp.Add, value = linear(5, 20, { growth = 5 }) }, -- 5 级时 40
+        { attribute = EAttribute.Attack, op = EModifierOp.Add, value = calc_by_level(20, 5, 5) }, -- 5 级时 40
     },
-}, 5, 1) -- 5 级：20 + (5-1)*5 = 40
+}, 5, 1)
 
 -- VIP 特权：Granted buff.vip 标签，并提升金币/经验倍率
-MiniASC.apply_effect(state, {
+MiniASC.apply_effect(state, defs, {
     id = EEffectId.VipPrivilege,
     duration_policy = EDurationPolicy.Infinite,
     granted_tags = { ETag.Buff_Vip },
@@ -393,10 +397,10 @@ local hero_attack_def = {
         },
     },
 }
-MiniASC.give_ability(state, hero_attack_def, 1, 1)
+MiniASC.give_ability(state, defs, hero_attack_def, 1, 1)
 
 -- 金矿：每 60 秒产出 100 金币；VIP 额外 ×1.2
-MiniASC.apply_effect(state, {
+MiniASC.apply_effect(state, defs, {
     id = EEffectId.BuildingGoldMine,
     duration_policy = EDurationPolicy.Infinite,
     period = 60,
@@ -409,7 +413,7 @@ MiniASC.apply_effect(state, {
 }, 1, 1)
 
 -- 铁矿厂：每 60 秒产出 50 铁矿；VIP 额外 ×1.2
-MiniASC.apply_effect(state, {
+MiniASC.apply_effect(state, defs, {
     id = EEffectId.BuildingIronMine,
     duration_policy = EDurationPolicy.Infinite,
     period = 60,
@@ -424,22 +428,22 @@ local world = WorldState.new()
 mini_gas.register_entity(world, "player", state)
 
 -- 模拟 120 秒的游戏时间：统一更新整个世界
-MiniASC.update_world(world, 120)
+MiniASC.update_world(world, defs, 120)
 
 -- 模拟英雄战斗：携带宠物且未被沉默，技能可以激活
-local ok1 = MiniASC.try_activate_ability(state, EAbilityId.HeroAttack) -- true
+local ok1 = MiniASC.try_activate_ability(state, defs, EAbilityId.HeroAttack) -- true
 
 -- 若英雄被沉默（添加 Block Tag），技能无法激活
 MiniASC.add_tag(state, ETag.State_Silenced)
-local ok2 = MiniASC.try_activate_ability(state, EAbilityId.HeroAttack) -- false
+local ok2 = MiniASC.try_activate_ability(state, defs, EAbilityId.HeroAttack) -- false
 MiniASC.remove_tag(state, ETag.State_Silenced)
 
 -- 读取最终数值
-print(MiniASC.get_current(state, EAttribute.Attack))       -- 100 + 80 + 40 = 220
-print(MiniASC.get_current(state, EAttribute.Defense))      -- 50 + 30 = 80
-print(MiniASC.get_current(state, EAttribute.GoldGainRate)) -- 1.0 * 1.2 = 1.2
-print(MiniASC.get_current(state, EAttribute.Gold))         -- 100 * 2 周期 * 1.2 = 240
-print(MiniASC.get_current(state, EAttribute.Iron))         -- 50 * 2 周期 * 1.2 = 120
+print(MiniASC.get_current(state, defs, EAttribute.Attack))       -- 100 + 80 + 40 = 220
+print(MiniASC.get_current(state, defs, EAttribute.Defense))      -- 50 + 30 = 80
+print(MiniASC.get_current(state, defs, EAttribute.GoldGainRate)) -- 1.0 * 1.2 = 1.2
+print(MiniASC.get_current(state, defs, EAttribute.Gold))         -- 100 * 2 周期 * 1.2 = 240
+print(MiniASC.get_current(state, defs, EAttribute.Iron))         -- 50 * 2 周期 * 1.2 = 120
 
 -- 整个世界状态可序列化
 local saved = json.encode(world)

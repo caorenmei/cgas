@@ -6,7 +6,7 @@ lua_lib/
 └── mini_gas/                      -- 独立目录
     ├── init.lua                   -- 模块入口，导出所有公共 API
     ├── types.lua                  -- LuaCATS 类型定义集中文件（不含枚举）
-    ├── state.lua                  -- EntityState / WorldState / register_entity
+    ├── state.lua                  -- EntityState / WorldState / Defs / register_entity
     ├── asc.lua                    -- MiniASC 无状态函数集合
     ├── ability.lua                -- GameplayAbility 运行时实例
     ├── effect.lua                 -- GameplayEffect 运行时实例
@@ -15,7 +15,7 @@ lua_lib/
     ├── tag.lua                    -- GameplayTagContainer 与标签匹配
     ├── event.lua                  -- GameplayEvent 派发与监听
     ├── task.lua                   -- GameplayTask 轻量异步任务
-    ├── spec.lua                   -- Spec 构造器与 GrowthCurve
+    ├── spec.lua                   -- Spec 构造器
     └── enum.lua                   -- 所有枚举常量定义（@enum）
 ```
 
@@ -44,19 +44,25 @@ local mini_gas = require("mini_gas")
 | `WorldState.new()` | 创建新的世界状态（`table<EntityId, EntityState>`） |
 | `mini_gas.register_entity(world, id, state)` | 注册实体状态到 WorldState（工具函数） |
 
-### 10.4 MiniASC
-
-所有 `MiniASC` 方法均为无状态函数，第一个参数为 `state` 或 `world`。
+### 10.4 Defs
 
 | 方法 | 说明 |
 |------|------|
-| `MiniASC.register_attributes(state, defs)` | 批量注册属性定义 |
-| `MiniASC.give_ability(state, spec, level, stack?)` | 授予技能 |
+| `Defs.new()` | 创建新的配置定义表，包含 `attribute_defs` / `ability_defs` / `effect_defs` |
+
+### 10.5 MiniASC
+
+所有 `MiniASC` 方法均为无状态函数，第一个参数为 `state` 或 `world`。需要读取/注册 Def 的方法接收 `defs` 作为第二个参数。
+
+| 方法 | 说明 |
+|------|------|
+| `MiniASC.register_attributes(state, defs, attr_defs)` | 批量注册属性定义到 `defs` 并初始化 `state.attributes` |
+| `MiniASC.give_ability(state, defs, spec, level, stack?)` | 授予技能 |
 | `MiniASC.remove_ability(state, ability_id)` | 移除技能 |
 | `MiniASC.set_ability_level(state, ability_id, level)` | 设置技能等级 |
 | `MiniASC.set_ability_stack(state, ability_id, stack)` | 设置技能 Stack |
-| `MiniASC.try_activate_ability(state, ability_id, payload?)` | 尝试激活技能 |
-| `MiniASC.apply_effect(state, spec, level, stack?)` | 应用效果 |
+| `MiniASC.try_activate_ability(state, defs, ability_id, payload?)` | 尝试激活技能 |
+| `MiniASC.apply_effect(state, defs, spec, level, stack?)` | 应用效果 |
 | `MiniASC.remove_effect(state, effect_id)` | 移除效果 |
 | `MiniASC.set_effect_level(state, effect_id, level)` | 设置效果等级 |
 | `MiniASC.set_effect_stack(state, effect_id, stack)` | 设置效果 Stack |
@@ -65,13 +71,13 @@ local mini_gas = require("mini_gas")
 | `MiniASC.has_tag(state, tag)` | 判断是否包含标签 |
 | `MiniASC.dispatch_event(state, event, payload?)` | 派发事件 |
 | `MiniASC.listen_event(state, event, listener)` | 监听事件 |
-| `MiniASC.update(state, dt)` | 推进时间并触发周期效果、冷却 |
-| `MiniASC.update_world(world, dt)` | 批量推进 WorldState 中所有实体的生命周期 |
+| `MiniASC.update(state, defs, dt)` | 推进时间并触发周期效果、冷却 |
+| `MiniASC.update_world(world, defs, dt)` | 批量推进 WorldState 中所有实体的生命周期 |
 | `MiniASC.get_base(state, attr)` | 获取属性 Base 值 |
-| `MiniASC.get_current(state, attr)` | 获取属性 Current 值 |
-| `MiniASC.set_current(state, attr, value)` | 设置属性 Current 值 |
+| `MiniASC.get_current(state, defs, attr)` | 获取属性 Current 值 |
+| `MiniASC.set_current(state, defs, attr, value)` | 设置属性 Current 值 |
 
-### 10.5 工具函数
+### 10.6 工具函数
 
 ```lua
 ---注入日志句柄（省略或传 nil 时关闭日志）
@@ -96,11 +102,6 @@ function mini_gas.adapt_abilities(raw_configs, adapter) end
 ---@param modifiers mini_gas.Modifier[]
 ---@return number
 function mini_gas.calc_attribute(base, entity_state, modifiers) end
-
----创建成长曲线（返回公式函数本身）
----@param formula mini_gas.GrowthCurve
----@return mini_gas.GrowthCurve
-function mini_gas.make_growth_curve(formula) end
 ```
 
 ---

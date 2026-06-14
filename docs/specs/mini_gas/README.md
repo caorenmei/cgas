@@ -45,9 +45,10 @@ Gameplay Ability System（GAS）参考 Unreal Engine 的设计思想，覆盖 Ab
 
 - **核心子系统**：具备 GameplayAbility、GameplayTag、GameplayEffect、Modifier、Attribute 等核心能力。
 - **代码独立**：目录独立为 `lua_lib/mini_gas`，不依赖任何外部 GAS 实现或共享源码文件。
-- **Spec 驱动成长**：所有可成长对象（Ability / Effect / Attribute）均通过 Spec 定义，支持等级、Stack、成长曲线。
+- **Spec 驱动成长**：所有可成长对象（Ability / Effect / Attribute）均通过 Spec 定义，支持等级、Stack、按类型公式函数。
 - **无魔术字符串**：所有标识符、标签、属性名、操作类型均通过 `@enum` 常量或 `@class` 类型定义，禁止在业务代码中直接书写字面量。
-- **无状态库**：`mini-gas` 自身不维护任何运行时状态，所有状态由调用方通过 `EntityState` 传入并持有，便于序列化与持久化。
+- **状态完全自包含**：运行时状态对象不引用任何外部对象（包括配置 Def、下划线查找表），可直接序列化与网络同步。
+- **Defs 分离**：配置定义集中存放在 `Defs` 表中，由调用方持有并在需要的 API 中传入。
 - **配置无关**：不绑定任何配置格式，通过适配器函数桥接任意配置源。
 
 ---
@@ -62,13 +63,13 @@ Gameplay Ability System（GAS）参考 Unreal Engine 的设计思想，覆盖 Ab
 | GameplayTag（标签） | 层级标签系统，支持精确匹配、父级匹配、Granted 标签管理 |
 | GameplayEffect（效果） | 对 Attribute 的修改单元，支持 Instant / Infinite / HasDuration / Periodic |
 | Modifier（修饰器） | 对属性的修改方式：Add、Multiply、Override、Compound |
-| Attribute（属性） | 数值定义，支持 Base 值与 Current 值，支持成长曲线 |
-| AttributeSet（属性集） | 一组相关 Attribute 的集合，便于批量注册与管理 |
-| MiniASC（能力系统组件） | 运行时入口，持有 Ability、Effect、Attribute、Tag |
+| Attribute（属性） | 数值定义，支持 Base 值与 Current 值；成长由外部系统负责 |
+| MiniASC（能力系统组件） | 运行时入口，操作 Ability、Effect、Attribute、Tag |
 | GameplayEvent（游戏事件） | 技能与效果之间的触发/监听机制 |
 | GameplayTask（轻量任务） | 延时、周期、等待事件等轻量异步任务 |
-| Spec 系统 | AbilitySpec、EffectSpec、AttributeSpec，支持等级、Stack、成长曲线 |
-| ConfigAdapter（配置适配器） | 将外部配置转换为 Spec 的桥梁 |
+| Defs（配置定义表） | 集中存放 AttributeDef / AbilityDef / EffectDef |
+| Spec 系统 | AbilitySpec、EffectSpec、AttributeSpec，支持等级、Stack、按类型公式 |
+| ConfigAdapter（配置适配器） | 将外部配置转换为 Def 的桥梁 |
 
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
@@ -80,11 +81,14 @@ mindmap
       Attribute
       Tag
       Event
+    Defs
+      attribute_defs
+      ability_defs
+      effect_defs
     Spec
       AbilitySpec
       EffectSpec
       AttributeSpec
-      GrowthCurve
     ConfigAdapter
       Excel
       JSON

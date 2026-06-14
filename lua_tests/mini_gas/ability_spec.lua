@@ -1,6 +1,7 @@
 require("lua_tests.support.env")
 local mini_gas = require("mini_gas")
 local EntityState = mini_gas.EntityState
+local Defs = mini_gas.Defs
 local MiniASC = mini_gas.MiniASC
 local EModifierOp = mini_gas.EModifierOp
 local EDurationPolicy = mini_gas.EDurationPolicy
@@ -35,10 +36,11 @@ describe("mini_gas ability", function()
 
     it("passive ability auto activates", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Attack, base = 100 },
         })
-        MiniASC.give_ability(state, {
+        MiniASC.give_ability(state, defs, {
             id = EAbilityId.Aura,
             activation_policy = EAbilityActivationPolicy.Passive,
             grant_tags = { ETag.AuraBuff },
@@ -54,16 +56,17 @@ describe("mini_gas ability", function()
         }, 1, 1)
 
         assert.is_true(MiniASC.has_tag(state, ETag.AuraBuff))
-        assert.equal(120, MiniASC.get_current(state, EAttribute.Attack))
+        assert.equal(120, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 
     it("active ability checks cost, cooldown and tags", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Hp, base = 1000, min = 0 },
             { name = EAttribute.Mp, base = 200, min = 0, max = 200 },
         })
-        MiniASC.give_ability(state, {
+        MiniASC.give_ability(state, defs, {
             id = EAbilityId.Fireball,
             activation_policy = EAbilityActivationPolicy.Active,
             cooldown = 5,
@@ -81,27 +84,28 @@ describe("mini_gas ability", function()
             },
         }, 1, 1)
 
-        local ok = MiniASC.try_activate_ability(state, EAbilityId.Fireball)
+        local ok = MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball)
         assert.is_true(ok)
-        assert.equal(180, MiniASC.get_current(state, EAttribute.Mp))
-        assert.equal(900, MiniASC.get_current(state, EAttribute.Hp))
+        assert.equal(180, MiniASC.get_current(state, defs, EAttribute.Mp))
+        assert.equal(900, MiniASC.get_current(state, defs, EAttribute.Hp))
 
         -- 冷却中无法再次激活
-        ok = MiniASC.try_activate_ability(state, EAbilityId.Fireball)
+        ok = MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball)
         assert.is_false(ok)
 
         -- 推进冷却后成功
-        MiniASC.update(state, 5)
-        ok = MiniASC.try_activate_ability(state, EAbilityId.Fireball)
+        MiniASC.update(state, defs, 5)
+        ok = MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball)
         assert.is_true(ok)
     end)
 
     it("active ability respects tags", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Mp, base = 100, min = 0 },
         })
-        MiniASC.give_ability(state, {
+        MiniASC.give_ability(state, defs, {
             id = EAbilityId.Fireball,
             activation_policy = EAbilityActivationPolicy.Active,
             cooldown = 0,
@@ -111,20 +115,21 @@ describe("mini_gas ability", function()
             effects = {},
         }, 1, 1)
 
-        assert.is_false(MiniASC.try_activate_ability(state, EAbilityId.Fireball))
+        assert.is_false(MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball))
         MiniASC.add_tag(state, ETag.Combat)
-        assert.is_true(MiniASC.try_activate_ability(state, EAbilityId.Fireball))
+        assert.is_true(MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball))
 
         MiniASC.add_tag(state, ETag.Stunned)
-        assert.is_false(MiniASC.try_activate_ability(state, EAbilityId.Fireball))
+        assert.is_false(MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball))
     end)
 
     it("reactive ability triggers on event", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Hp, base = 100, min = 0 },
         })
-        MiniASC.give_ability(state, {
+        MiniASC.give_ability(state, defs, {
             id = EAbilityId.Counter,
             activation_policy = EAbilityActivationPolicy.Reactive,
             activation_event = EGameplayEvent.AttributeChanged,
@@ -140,7 +145,7 @@ describe("mini_gas ability", function()
             },
         }, 1, 1)
 
-        MiniASC.set_current(state, EAttribute.Hp, 90)
-        assert.equal(80, MiniASC.get_current(state, EAttribute.Hp))
+        MiniASC.set_current(state, defs, EAttribute.Hp, 90)
+        assert.equal(80, MiniASC.get_current(state, defs, EAttribute.Hp))
     end)
 end)

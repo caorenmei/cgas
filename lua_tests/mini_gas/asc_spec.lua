@@ -3,6 +3,7 @@ local mini_gas = require("mini_gas")
 local state_mod = require("mini_gas.state")
 local EntityState = mini_gas.EntityState
 local WorldState = mini_gas.WorldState
+local Defs = mini_gas.Defs
 local MiniASC = mini_gas.MiniASC
 local EModifierOp = mini_gas.EModifierOp
 local EDurationPolicy = mini_gas.EDurationPolicy
@@ -35,7 +36,8 @@ describe("mini_gas asc", function()
 
     it("full example: equipment + vip + building production", function()
         local state = EntityState.new()
-        MiniASC.register_attributes(state, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
             { name = EAttribute.Attack, base = 100, min = 0 },
             { name = EAttribute.Defense, base = 50, min = 0 },
             { name = EAttribute.Gold, base = 0, min = 0 },
@@ -44,7 +46,7 @@ describe("mini_gas asc", function()
             { name = EAttribute.ExpGainRate, base = 1.0, min = 0 },
         })
 
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.Sword,
             duration_policy = EDurationPolicy.Infinite,
             modifiers = {
@@ -53,7 +55,7 @@ describe("mini_gas asc", function()
             },
         }, 1, 1)
 
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.Vip,
             duration_policy = EDurationPolicy.Infinite,
             granted_tags = { ETag.Vip },
@@ -63,7 +65,7 @@ describe("mini_gas asc", function()
             },
         }, 1, 1)
 
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.GoldMine,
             duration_policy = EDurationPolicy.Infinite,
             period = 60,
@@ -73,7 +75,7 @@ describe("mini_gas asc", function()
             },
         }, 1, 1)
 
-        MiniASC.apply_effect(state, {
+        MiniASC.apply_effect(state, defs, {
             id = EEffectId.IronMine,
             duration_policy = EDurationPolicy.Infinite,
             period = 60,
@@ -83,28 +85,29 @@ describe("mini_gas asc", function()
             },
         }, 1, 1)
 
-        MiniASC.update(state, 120)
+        MiniASC.update(state, defs, 120)
 
-        assert.equal(180, MiniASC.get_current(state, EAttribute.Attack))
-        assert.equal(80, MiniASC.get_current(state, EAttribute.Defense))
-        assert.near(1.2, MiniASC.get_current(state, EAttribute.GoldGainRate), 0.0001)
-        assert.near(240, MiniASC.get_current(state, EAttribute.Gold), 0.0001)
-        assert.near(120, MiniASC.get_current(state, EAttribute.Iron), 0.0001)
+        assert.equal(180, MiniASC.get_current(state, defs, EAttribute.Attack))
+        assert.equal(80, MiniASC.get_current(state, defs, EAttribute.Defense))
+        assert.near(1.2, MiniASC.get_current(state, defs, EAttribute.GoldGainRate), 0.0001)
+        assert.near(240, MiniASC.get_current(state, defs, EAttribute.Gold), 0.0001)
+        assert.near(120, MiniASC.get_current(state, defs, EAttribute.Iron), 0.0001)
     end)
 
     it("update_world updates all entities", function()
         local world = WorldState.new()
         local state1 = EntityState.new()
         local state2 = EntityState.new()
-        MiniASC.register_attributes(state1, { { name = EAttribute.Gold, base = 0, min = 0 } })
-        MiniASC.register_attributes(state2, { { name = EAttribute.Gold, base = 0, min = 0 } })
-        MiniASC.apply_effect(state1, {
+        local defs = Defs.new()
+        MiniASC.register_attributes(state1, defs, { { name = EAttribute.Gold, base = 0, min = 0 } })
+        MiniASC.register_attributes(state2, defs, { { name = EAttribute.Gold, base = 0, min = 0 } })
+        MiniASC.apply_effect(state1, defs, {
             id = EEffectId.GoldMine,
             duration_policy = EDurationPolicy.Infinite,
             period = 1,
             modifiers = { { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 1 } },
         }, 1, 1)
-        MiniASC.apply_effect(state2, {
+        MiniASC.apply_effect(state2, defs, {
             id = EEffectId.GoldMine,
             duration_policy = EDurationPolicy.Infinite,
             period = 1,
@@ -113,9 +116,9 @@ describe("mini_gas asc", function()
         state_mod.register_entity(world, "s1", state1)
         state_mod.register_entity(world, "s2", state2)
 
-        MiniASC.update_world(world, 3)
-        assert.equal(3, MiniASC.get_current(state1, EAttribute.Gold))
-        assert.equal(6, MiniASC.get_current(state2, EAttribute.Gold))
+        MiniASC.update_world(world, defs, 3)
+        assert.equal(3, MiniASC.get_current(state1, defs, EAttribute.Gold))
+        assert.equal(6, MiniASC.get_current(state2, defs, EAttribute.Gold))
     end)
 
     it("listen_event receives dispatched events", function()

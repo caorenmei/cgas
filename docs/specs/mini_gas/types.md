@@ -24,14 +24,30 @@ local EAbilityActivationPolicy = mini_gas.EAbilityActivationPolicy
 ---@alias mini_gas.AbilityId mini_gas.EAbilityId | string | integer
 ---@alias mini_gas.EffectId mini_gas.EEffectId | string | integer
 ---@alias mini_gas.GameplayEventId mini_gas.EGameplayEvent | string | integer
----@alias mini_gas.GrowthCurve fun(level: number, ...): number
 ```
 
 ### 5.3 核心类型
 
-> 约定：除 `MiniASC` 这类无状态函数集合外，所有配置对象（Def / Spec / GrowthCurve）与运行时数据对象（Modifier / GameplayEffect / GameplayAbility / GameplayTagContainer / GameplayTask / EntityState / WorldState）的实例均为**无元表的普通 Lua 表**，便于外部配置桥接、序列化与持久化。对象操作统一通过对应模块的函数完成。运行时属性值直接以数字形式存储于 `EntityState.attributes` 中。
+> **状态自包含约定**：`EntityState` / `WorldState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask` 的实例均为**无元表的普通 Lua 表**，且**不得引用任何外部对象**（包括配置 Def、其他运行时实例、下划线隐藏的查找表等）。所有运行时数据在创建时即自包含完整副本，可直接序列化、持久化与网络同步。对象操作统一通过对应模块的函数完成。
 
-#### 5.3.1 标签容器
+#### 5.3.1 配置定义表 `Defs`
+
+`Defs` 由调用方持有，包含所有静态配置定义。需要读取配置或注册新 Def 的 API 会接收 `defs` 参数。
+
+```lua
+---@class mini_gas.Defs
+---@field attribute_defs table<mini_gas.AttributeId, mini_gas.AttributeDef>
+---@field ability_defs table<mini_gas.AbilityId, mini_gas.GameplayAbilityDef>
+---@field effect_defs table<mini_gas.EffectId, mini_gas.EffectDef>
+```
+
+创建：
+
+```lua
+local defs = mini_gas.Defs.new()
+```
+
+#### 5.3.2 标签容器
 
 标签直接使用 `mini_gas.TagId` 字符串/整数值，不封装 `GameplayTag` 对象。
 
@@ -78,17 +94,11 @@ function tag_mod.has_all(container, tags) end
 function tag_mod.matches(a, b) end
 ```
 
-#### 5.3.2 成长曲线
-
-成长曲线是任意公式函数，不强制 `base` / `params` 字段，也不限定仅按等级成长。
-
-```lua
----@alias mini_gas.GrowthCurve fun(level: number, ...): number
-```
-
 #### 5.3.3 属性
 
 `EntityState.attributes` 是普通 `table<AttributeId, number>`，不封装 `Attribute` 对象。
+
+`AttributeDef` 不再定义成长公式，属性成长由外部系统负责（例如通过 `set_current` 或直接修改 `state.attributes`）。
 
 ```lua
 ---@class mini_gas.AttributeDef
@@ -97,12 +107,13 @@ function tag_mod.matches(a, b) end
 ---@field base? number
 ---@field min? number
 ---@field max? number
----@field growth? mini_gas.GrowthCurve
 ```
 
 #### 5.3.4 修饰器
 
-`ModifierDef.value` 仅支持 `number` 或 `fun(self: Modifier, v: number): number`（用于 `Compound`）。`Modifier` 实例不直接引用 `ModifierDef`，而是通过 `effect_id` + `mod_index` 在 `state._effect_defs[effect_id].modifiers[mod_index]` 中查找对应 Def。
+`ModifierDef.value` 仅支持 `number` 或 `fun(self: Modifier, v: number): number`（用于 `Compound`）。
+
+`Modifier` 实例是**自包含**的运行时数据，保存完整的 Modifier 配置与运行时字段，不引用外部 Def。
 
 ```lua
 ---@class mini_gas.ModifierDef
@@ -114,8 +125,12 @@ function tag_mod.matches(a, b) end
 ---@field blocked_tags? mini_gas.TagId[]
 
 ---@class mini_gas.Modifier
----@field effect_id mini_gas.EffectId
----@field mod_index number
+---@field attribute mini_gas.AttributeId
+---@field op mini_gas.EModifierOp
+---@field value number | fun(self: mini_gas.Modifier, v: number): number
+---@field priority? number
+---@field require_tags? mini_gas.TagId[]
+---@field blocked_tags? mini_gas.TagId[]
 ---@field level number
 ---@field source any
 ---@field stack? number
@@ -124,10 +139,9 @@ function tag_mod.matches(a, b) end
 修饰器操作：
 
 ```lua
----@param state mini_gas.EntityState
 ---@param mod mini_gas.Modifier
----@return number|fun(self: mini_gas.Modifier, v: number): number
-function modifier_mod.value(state, mod) end
+---@return number|fun(self: mini_gas.Modifier, v: number): number|nil
+function modifier_mod.value(mod) end
 
 ---@param state mini_gas.EntityState
 ---@param mod mini_gas.Modifier
@@ -137,15 +151,17 @@ function modifier_mod.is_active(state, mod) end
 
 #### 5.3.5 效果
 
-`GameplayEffect` 实例不直接引用 `EffectDef`，而是通过 `spec_id` 引用；`EffectDef` 由 `state._effect_defs[spec_id]` 持有。
+`EffectDef` 是静态配置；`GameplayEffect` 实例是**自包含**的运行时数据，保存完整的 Effect 配置与运行时字段，并在创建时把 `ModifierDef[]` 转换为 `Modifier[]`。
+
+`duration` / `period` 支持常量或公式函数 `fun(self: GameplayEffect, ...): number`。
 
 ```lua
 ---@class mini_gas.EffectDef
 ---@field id mini_gas.EffectId
 ---@field alias? string|integer
 ---@field duration_policy mini_gas.EDurationPolicy
----@field duration? number | mini_gas.GrowthCurve
----@field period? number | mini_gas.GrowthCurve
+---@field duration? number | fun(self: mini_gas.GameplayEffect, ...): number
+---@field period? number | fun(self: mini_gas.GameplayEffect, ...): number
 ---@field modifiers mini_gas.ModifierDef[]
 ---@field stacking? mini_gas.EStackingPolicy
 ---@field max_stack? number
@@ -155,7 +171,18 @@ function modifier_mod.is_active(state, mod) end
 ---@field source any
 
 ---@class mini_gas.GameplayEffect
----@field spec_id mini_gas.EffectId
+---@field id mini_gas.EffectId
+---@field alias? string|integer
+---@field duration_policy mini_gas.EDurationPolicy
+---@field duration? number | fun(self: mini_gas.GameplayEffect, ...): number
+---@field period? number | fun(self: mini_gas.GameplayEffect, ...): number
+---@field modifiers mini_gas.Modifier[]
+---@field stacking? mini_gas.EStackingPolicy
+---@field max_stack? number
+---@field granted_tags? mini_gas.TagId[]
+---@field require_tags? mini_gas.TagId[]
+---@field blocked_tags? mini_gas.TagId[]
+---@field source any
 ---@field level number
 ---@field stack number
 ---@field elapsed number
@@ -171,42 +198,54 @@ function modifier_mod.is_active(state, mod) end
 ---@return boolean
 function effect_mod.is_active(state, effect) end
 
----@param state mini_gas.EntityState
 ---@param effect mini_gas.GameplayEffect
 ---@return mini_gas.Modifier[]
-function effect_mod.active_modifiers(state, effect) end
+function effect_mod.active_modifiers(effect) end
 
----@param state mini_gas.EntityState
 ---@param effect mini_gas.GameplayEffect
 ---@return number
-function effect_mod.period_value(state, effect) end
+function effect_mod.period_value(effect) end
 ```
 
 #### 5.3.6 技能
 
-`GameplayAbility` 实例不直接引用 `GameplayAbilityDef`，而是通过 `spec_id` 引用；`GameplayAbilityDef` 由 `state._ability_defs[spec_id]` 持有。
+`GameplayAbilityDef` 是静态配置；`GameplayAbility` 实例是**自包含**的运行时数据，保存完整的 Ability 配置与运行时字段。
+
+`cooldown` / `cost[attr]` 支持常量或公式函数 `fun(self: GameplayAbility, ...): number`。
 
 ```lua
 ---@class mini_gas.GameplayAbilityDef
 ---@field id mini_gas.AbilityId
 ---@field alias? string|integer
 ---@field activation_policy mini_gas.EAbilityActivationPolicy
----@field cooldown? number | mini_gas.GrowthCurve
----@field cost? table<mini_gas.AttributeId, number | mini_gas.GrowthCurve>
+---@field cooldown? number | fun(self: mini_gas.GameplayAbility, ...): number
+---@field cost? table<mini_gas.AttributeId, number | fun(self: mini_gas.GameplayAbility, ...): number>
 ---@field require_tags? mini_gas.TagId[]
 ---@field blocked_tags? mini_gas.TagId[]
 ---@field grant_tags? mini_gas.TagId[]
 ---@field activation_event? mini_gas.GameplayEventId
 ---@field effects? mini_gas.EffectDef[]
----@field source any
 ---@field can_activate? fun(state: mini_gas.EntityState, payload: table?): boolean?
+---@field source any
 
 ---@class mini_gas.GameplayAbility
----@field spec_id mini_gas.AbilityId
+---@field id mini_gas.AbilityId
+---@field alias? string|integer
+---@field activation_policy mini_gas.EAbilityActivationPolicy
+---@field cooldown? number | fun(self: mini_gas.GameplayAbility, ...): number
+---@field cost? table<mini_gas.AttributeId, number | fun(self: mini_gas.GameplayAbility, ...): number>
+---@field require_tags? mini_gas.TagId[]
+---@field blocked_tags? mini_gas.TagId[]
+---@field grant_tags? mini_gas.TagId[]
+---@field activation_event? mini_gas.GameplayEventId
+---@field effects? mini_gas.EffectDef[]
+---@field can_activate? fun(state: mini_gas.EntityState, payload: table?): boolean?
+---@field source any
 ---@field level number
 ---@field stack number
 ---@field is_active boolean
 ---@field cooldown_remaining number
+---@field listener? fun(payload:table?)
 ```
 
 技能操作：
@@ -220,25 +259,22 @@ function ability_mod.can_activate(state, ability) end
 ---@param ability mini_gas.GameplayAbility
 function ability_mod.activate(ability) end
 
----@param state mini_gas.EntityState
 ---@param ability mini_gas.GameplayAbility
-function ability_mod.end_ability(state, ability) end
+function ability_mod.end_ability(ability) end
 ```
 
 #### 5.3.7 实体状态
 
+`EntityState` 不持有任何配置定义或下划线查找表。
+
 ```lua
 ---@class mini_gas.EntityState
 ---@field attributes table<mini_gas.AttributeId, number>
----@field _attribute_defs table<mini_gas.AttributeId, mini_gas.AttributeDef>
 ---@field abilities table<string, mini_gas.GameplayAbility>
----@field _ability_defs table<string, mini_gas.GameplayAbilityDef>
 ---@field effects table<string, mini_gas.GameplayEffect>
----@field _effect_defs table<string, mini_gas.EffectDef>
 ---@field tags mini_gas.GameplayTagContainer
 ---@field event_listeners table<mini_gas.GameplayEventId, fun(payload: table?)[]>
 ---@field tasks mini_gas.GameplayTask[]
----@field _reactive_listeners table<string, fun(payload: table?)>
 ---@field source any
 ```
 
@@ -278,19 +314,19 @@ function mini_gas.register_entity(world, id, state) end
 
 #### 5.3.10 能力系统组件
 
-`MiniASC` 是**无状态**的函数集合，所有操作均接收 `EntityState` 或 `WorldState` 作为第一个参数。
+`MiniASC` 是**无状态**的函数集合。需要读取或注册 Def 的操作接收 `defs` 作为第二个参数；其余操作保持简洁签名。
 
 ```lua
 ---@class mini_gas.MiniASC
 local MiniASC = {}
 
-function MiniASC.register_attributes(state, defs) end
-function MiniASC.give_ability(state, spec, level, stack?) end
+function MiniASC.register_attributes(state, defs, attr_defs) end
+function MiniASC.give_ability(state, defs, spec, level, stack?) end
 function MiniASC.remove_ability(state, ability_id) end
 function MiniASC.set_ability_level(state, ability_id, level) end
 function MiniASC.set_ability_stack(state, ability_id, stack) end
-function MiniASC.try_activate_ability(state, ability_id, payload?) end
-function MiniASC.apply_effect(state, spec, level, stack?) end
+function MiniASC.try_activate_ability(state, defs, ability_id, payload?) end
+function MiniASC.apply_effect(state, defs, spec, level, stack?) end
 function MiniASC.remove_effect(state, effect_id) end
 function MiniASC.set_effect_level(state, effect_id, level) end
 function MiniASC.set_effect_stack(state, effect_id, stack) end
@@ -299,11 +335,11 @@ function MiniASC.remove_tag(state, tag) end
 function MiniASC.has_tag(state, tag) end
 function MiniASC.dispatch_event(state, event, payload?) end
 function MiniASC.listen_event(state, event, listener) end
-function MiniASC.update(state, dt) end
-function MiniASC.update_world(world, dt) end
+function MiniASC.update(state, defs, dt) end
+function MiniASC.update_world(world, defs, dt) end
 function MiniASC.get_base(state, attr) end
-function MiniASC.get_current(state, attr) end
-function MiniASC.set_current(state, attr, value) end
+function MiniASC.get_current(state, defs, attr) end
+function MiniASC.set_current(state, defs, attr, value) end
 ```
 
 ---

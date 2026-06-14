@@ -1,5 +1,5 @@
 --- Modifier 与属性聚合逻辑
---- Modifier 实例不直接引用 Def，而是通过 effect_id + mod_index 引用。
+--- Modifier 实例为自包含普通 Lua 表，不引用外部 Def。
 local enum = require("mini_gas.enum")
 local tag_mod = require("mini_gas.tag")
 local log_mod = require("mini_gas.log")
@@ -8,53 +8,31 @@ local M = {}
 
 M.Modifier = {}
 
----@param effect_id mini_gas.EffectId
----@param mod_index number
+---创建自包含 Modifier 实例
+---@param def mini_gas.ModifierDef
 ---@param level number
 ---@param source any
 ---@param stack number|nil
 ---@return mini_gas.Modifier
-function M.Modifier.new(effect_id, mod_index, level, source, stack)
+function M.Modifier.new(def, level, source, stack)
     return {
-        effect_id = effect_id,
-        mod_index = mod_index,
+        attribute = def.attribute,
+        op = def.op,
+        value = def.value,
+        priority = def.priority,
+        require_tags = def.require_tags,
+        blocked_tags = def.blocked_tags,
         level = level or 1,
         source = source,
         stack = stack,
     }
 end
 
----通过 State 查找 ModifierDef
----@param state mini_gas.EntityState
----@param mod mini_gas.Modifier
----@return mini_gas.ModifierDef|nil
-function M.find_def(state, mod)
-    local effect_def = state._effect_defs and state._effect_defs[mod.effect_id]
-    if not effect_def then
-        return nil
-    end
-    return effect_def.modifiers[mod.mod_index]
-end
-
 ---获取当前数值或复合函数
----@param state mini_gas.EntityState
 ---@param mod mini_gas.Modifier
 ---@return number|fun(self: mini_gas.Modifier, v: number): number|nil
-function M.value(state, mod)
-    local def = M.find_def(state, mod)
-    if not def then
-        log_mod.warn("Modifier def not found: " .. tostring(mod.effect_id) .. "[" .. tostring(mod.mod_index) .. "]")
-        return 0
-    end
-    local v = def.value
-    if type(v) == "number" then
-        return v
-    end
-    if type(v) == "function" then
-        return v
-    end
-    log_mod.warn("非法 Modifier 数值类型: " .. tostring(v))
-    return 0
+function M.value(mod)
+    return mod.value
 end
 
 ---判断 Modifier 是否满足标签约束
@@ -62,13 +40,9 @@ end
 ---@param mod mini_gas.Modifier
 ---@return boolean
 function M.is_active(state, mod)
-    local def = M.find_def(state, mod)
-    if not def then
-        return false
-    end
     local container = state.tags
-    local req = def.require_tags or {}
-    local blocked = def.blocked_tags or {}
+    local req = mod.require_tags or {}
+    local blocked = mod.blocked_tags or {}
     return tag_mod.has_all(container, req) and not tag_mod.has_any(container, blocked)
 end
 
@@ -84,21 +58,15 @@ function M.calc_attribute(base, state, modifiers)
     local compounds = {}
 
     for _, mod in ipairs(modifiers or {}) do
-        local def = M.find_def(state, mod)
-        if not def then
-            log_mod.warn("Modifier def not found in calc_attribute")
-            goto continue
-        end
-
         if not M.is_active(state, mod) then
             goto continue
         end
 
-        local op = def.op
+        local op = mod.op
         if op == enum.EModifierOp.Compound then
-            compounds[#compounds + 1] = { fn = def.value, priority = def.priority or 0, mod = mod }
+            compounds[#compounds + 1] = { fn = mod.value, priority = mod.priority or 0, mod = mod }
         else
-            local val = M.value(state, mod)
+            local val = mod.value
             if type(val) == "function" then
                 log_mod.warn("非 Compound Modifier 的 value 不能是函数")
                 goto continue
@@ -113,7 +81,7 @@ function M.calc_attribute(base, state, modifiers)
             elseif op == enum.EModifierOp.Multiply then
                 multiply_product = multiply_product * val
             elseif op == enum.EModifierOp.Override then
-                overrides[#overrides + 1] = { value = val, priority = def.priority or 0 }
+                overrides[#overrides + 1] = { value = val, priority = mod.priority or 0 }
             else
                 log_mod.warn("未知 Modifier 操作类型: " .. tostring(op))
             end

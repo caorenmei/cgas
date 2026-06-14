@@ -1,17 +1,10 @@
---- Spec 基础结构与成长曲线
+--- Spec 基础结构
 --- 配置类对象均为无元表的普通 Lua 表。
 local M = {}
 
 M.AbilitySpec = {}
 M.EffectSpec = {}
 M.AttributeSpec = {}
-
----创建成长曲线（返回公式函数本身）
----@param formula mini_gas.GrowthCurve
----@return mini_gas.GrowthCurve
-function M.make_growth_curve(formula)
-    return formula
-end
 
 ---创建 AbilitySpec
 ---@param def_id mini_gas.AbilityId

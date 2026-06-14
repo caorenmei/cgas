@@ -8,7 +8,12 @@ local EModifierOp = mini_gas.EModifierOp
 local EDurationPolicy = mini_gas.EDurationPolicy
 local EAbilityActivationPolicy = mini_gas.EAbilityActivationPolicy
 
+local Defs = mini_gas.Defs
+
 local M = {}
+
+---@type mini_gas.Defs
+local defs = Defs.new()
 
 ---@class mini_gas.demo.weihu_shan.GameState : mini_gas.EntityState
 ---@field _round number
@@ -133,10 +138,11 @@ local ability_defs = {
 ---创建新游戏状态
 ---@return mini_gas.demo.weihu_shan.GameState
 function M.new_game()
+    defs = Defs.new()
     local state = EntityState.new()
     ---@cast state mini_gas.demo.weihu_shan.GameState
 
-    MiniASC.register_attributes(state, {
+    MiniASC.register_attributes(state, defs, {
         { name = M.EAttribute.Credibility, base = 0, min = 0 },
         { name = M.EAttribute.Suspicion, base = 0, min = 0 },
         { name = M.EAttribute.Courage, base = 50, min = 0, max = 100 },
@@ -147,7 +153,7 @@ function M.new_game()
     MiniASC.add_tag(state, M.ETag.UnderInterrogation)
 
     for _, def in pairs(ability_defs) do
-        MiniASC.give_ability(state, def, 1, 1)
+        MiniASC.give_ability(state, defs, def, 1, 1)
     end
 
     state._round = 1
@@ -175,8 +181,8 @@ function M.act(state, ability_id, choice)
         return { success = false, message = "游戏已结束", credibility_increased = false, suspicion_increased = false, game_over = true, win = state._win }
     end
 
-    local old_cred = MiniASC.get_current(state, M.EAttribute.Credibility)
-    local old_susp = MiniASC.get_current(state, M.EAttribute.Suspicion)
+    local old_cred = MiniASC.get_current(state, defs, M.EAttribute.Credibility)
+    local old_susp = MiniASC.get_current(state, defs, M.EAttribute.Suspicion)
 
     local result = {
         success = false,
@@ -188,7 +194,7 @@ function M.act(state, ability_id, choice)
     }
 
     -- 检查 Ability 是否可激活
-    local ok = MiniASC.try_activate_ability(state, ability_id)
+    local ok = MiniASC.try_activate_ability(state, defs, ability_id)
     if not ok then
         result.message = "此时无法使用该应对。"
         return result
@@ -196,18 +202,18 @@ function M.act(state, ability_id, choice)
 
     if ability_id == M.EAbilityId.AnswerLingo then
         if choice == "success" then
-            MiniASC.apply_effect(state, effect_defs[M.EEffectId.LingoSuccess], 1, 1)
+            MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.LingoSuccess], 1, 1)
             result.message = "你对上了黑话，座山雕点了点头。"
             result.success = true
         else
-            MiniASC.apply_effect(state, effect_defs[M.EEffectId.LingoFail], 1, 1)
+            MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.LingoFail], 1, 1)
             result.message = "你答错了黑话，座山雕皱起了眉头。"
         end
     elseif ability_id == M.EAbilityId.ShowMap then
         -- 献图：应用震撼效果后判定最终结局
-        MiniASC.apply_effect(state, effect_defs[M.EEffectId.MapShock], 1, 1)
-        local cred = MiniASC.get_current(state, M.EAttribute.Credibility)
-        local susp = MiniASC.get_current(state, M.EAttribute.Suspicion)
+        MiniASC.apply_effect(state, defs, effect_defs[M.EEffectId.MapShock], 1, 1)
+        local cred = MiniASC.get_current(state, defs, M.EAttribute.Credibility)
+        local susp = MiniASC.get_current(state, defs, M.EAttribute.Suspicion)
         state._game_over = true
         if susp < 50 and cred >= 80 then
             state._win = true
@@ -231,8 +237,8 @@ function M.act(state, ability_id, choice)
         result.message = "未知动作。"
     end
 
-    local new_cred = MiniASC.get_current(state, M.EAttribute.Credibility)
-    local new_susp = MiniASC.get_current(state, M.EAttribute.Suspicion)
+    local new_cred = MiniASC.get_current(state, defs, M.EAttribute.Credibility)
+    local new_susp = MiniASC.get_current(state, defs, M.EAttribute.Suspicion)
     result.credibility_increased = new_cred > old_cred
     result.suspicion_increased = new_susp > old_susp
 
@@ -292,25 +298,25 @@ end
 ---@param state mini_gas.demo.weihu_shan.GameState
 ---@return number
 function M.get_credibility(state)
-    return MiniASC.get_current(state, M.EAttribute.Credibility)
+    return MiniASC.get_current(state, defs, M.EAttribute.Credibility)
 end
 
 ---@param state mini_gas.demo.weihu_shan.GameState
 ---@return number
 function M.get_suspicion(state)
-    return MiniASC.get_current(state, M.EAttribute.Suspicion)
+    return MiniASC.get_current(state, defs, M.EAttribute.Suspicion)
 end
 
 ---@param state mini_gas.demo.weihu_shan.GameState
 ---@return number
 function M.get_courage(state)
-    return MiniASC.get_current(state, M.EAttribute.Courage)
+    return MiniASC.get_current(state, defs, M.EAttribute.Courage)
 end
 
 ---@param state mini_gas.demo.weihu_shan.GameState
 ---@return number
 function M.get_eloquence(state)
-    return MiniASC.get_current(state, M.EAttribute.Eloquence)
+    return MiniASC.get_current(state, defs, M.EAttribute.Eloquence)
 end
 
 return M

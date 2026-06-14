@@ -18,12 +18,8 @@ end
 
 ---计算初始 Base 值
 ---@param def mini_gas.AttributeDef
----@param level number
 ---@return number
-function M.calc_base(def, level)
-    if def.growth then
-        return def.growth(level)
-    end
+function M.calc_base(def)
     return def.base or 0
 end
 

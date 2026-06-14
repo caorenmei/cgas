@@ -4,8 +4,9 @@
 ### 8.1 设计原则
 
 - `mini-gas` 不读取任何文件，也不解析任何配置格式。
-- 所有配置通过**适配器函数**转换为 Spec 定义结构。
+- 所有配置通过**适配器函数**转换为 Def 结构。
 - 适配器由业务方提供，可复用、可替换。
+- 配置定义（Def）集中存放在 `mini_gas.Defs` 中，由调用方持有并在需要的 API 中传入。
 
 ### 8.2 适配器接口
 
@@ -13,9 +14,9 @@
 ---@alias mini_gas.ConfigAdapter fun(raw_config: any): mini_gas.GameplayAbilityDef|mini_gas.EffectDef|mini_gas.AttributeDef
 ```
 
-业务方提供任意函数，输入原始配置，输出对应 Spec 定义。
+业务方提供任意函数，输入原始配置，输出对应 Def。
 
-### 8.3 示例：从 JSON 桥接 EffectSpec
+### 8.3 示例：从 JSON 桥接 EffectDef
 
 以下示例展示策划使用 `integer` 作为 alias、成长使用公式、项目级 `@enum` 由业务维护。
 
@@ -57,10 +58,9 @@ local effect_by_alias = {
 }
 ```
 
-通用线性成长公式：
+通用线性成长 helper（业务方定义）：
 
 ```lua
----@type mini_gas.GrowthCurve
 local function linear_growth(level, base, growth)
     return base + (level - 1) * (growth or 0)
 end
@@ -97,12 +97,13 @@ end
 
 ```lua
 local state = EntityState.new()
-MiniASC.register_attributes(state, {
+local defs = Defs.new()
+MiniASC.register_attributes(state, defs, {
     { name = EAttribute.Attack, base = 100 },
 })
 
 local effect_def = effect_adapter(json.decode(effect_config_text), 3)
-MiniASC.apply_effect(state, effect_def, 3, 1) -- 3 级时 value = 50 + (3-1)*10 = 70
+MiniASC.apply_effect(state, defs, effect_def, 3, 1) -- 3 级时 value = 50 + (3-1)*10 = 70
 
 -- state 为纯 Lua 表，可直接序列化
 local saved = json.encode(state)

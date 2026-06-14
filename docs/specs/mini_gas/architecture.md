@@ -7,7 +7,7 @@
 
 ### 3.2 Spec 驱动成长
 
-游戏中的英雄、技能、装备、Buff 都具有成长性。`mini-gas` 通过 **Spec** 描述这些对象的等级、Stack、成长曲线，运行时由 `MiniASC` 根据 Spec 实例化并更新。
+游戏中的英雄、技能、装备、Buff 都具有成长性。`mini-gas` 通过 **Spec** 描述这些对象的等级、Stack、成长公式，运行时由 `MiniASC` 根据 Spec 实例化并更新。
 
 ### 3.3 无魔术字符串
 
@@ -24,9 +24,11 @@
 
 业务代码禁止直接书写 `"attr.max_hp"`、`"Add"`、`"ability.attack"` 等字面量。业务 ID 应由策划配置并通过 `ConfigAdapter` 映射到项目级 `@enum`。
 
-### 3.4 无状态库
+### 3.4 状态完全自包含
 
-`mini-gas` 自身不维护任何运行时状态。所有状态由调用方通过 `EntityState` 传入并持有，业务系统可同时存在任意多个 `EntityState` 实例，互不干扰。状态外置后可直接序列化，便于保存、加载、网络同步与回放。
+`mini-gas` 的运行时状态对象（`EntityState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask`）均为无元表的普通 Lua 表，且**不引用任何外部对象**（包括配置 Def、下划线查找表、其他运行时实例）。运行时数据在创建时即复制完整的 Def 信息，可直接序列化、持久化与网络同步。
+
+配置定义集中存放在 `Defs` 表中，由调用方持有，并在需要的 API 调用中传入。
 
 ### 3.5 事件驱动
 
@@ -44,13 +46,14 @@ mindmap
       AbilitySpec
       EffectSpec
       AttributeSpec
-      GrowthCurve
+      按类型公式函数
     无魔术字符串
       idAliasText["alias: string | integer"]
       项目级 @enum
       ConfigAdapter 映射
-    无状态库
+    状态完全自包含
       EntityState 外置
+      Defs 分离
       便于序列化
       便于持久化
     事件驱动
@@ -68,12 +71,13 @@ mindmap
 %%{init: {'theme': 'neutral'}}%%
 flowchart TD
     A[外部配置源<br/>Excel / JSON / DB / 策划脚本 / 硬编码] -->|原始配置| B[ConfigAdapter<br/>配置适配器]
-    B -->|AbilitySpec / EffectSpec /<br/>AttributeSpec / GrowthCurve| C[mini_gas.MiniASC]
-    D[EntityState<br/>业务方持有<br/>可序列化] -->|state| C
+    B -->|AbilityDef / EffectDef /<br/>AttributeDef| D[mini_gas.Defs]
+    D -->|defs| C[mini_gas.MiniASC]
+    E[EntityState<br/>业务方持有<br/>可序列化] -->|state| C
     W[WorldState<br/>table<EntityId, EntityState>] -->|world| C
-    C -->|修改后的 state| D
+    C -->|修改后的 state| E
     C -->|修改后的 world| W
-    C -->|计算结果| E[业务系统使用方<br/>战斗 / 技能 / VIP / 道具 / 建筑 / 任务 / 成长]
+    C -->|计算结果| F[业务系统使用方<br/>战斗 / 技能 / VIP / 道具 / 建筑 / 任务 / 成长]
 ```
 
 ```mermaid
@@ -92,6 +96,7 @@ mindmap
       EGameplayEvent
     idClass["@class"]
       MiniASC
+      Defs
       EntityState
       WorldState
       GameplayAbility
@@ -106,7 +111,6 @@ mindmap
       AbilitySpec
       EffectSpec
       AttributeSpec
-      GrowthCurve
     idAlias["@alias"]
       TagId
       AttributeId
