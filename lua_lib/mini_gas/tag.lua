@@ -1,0 +1,125 @@
+--- GameplayTag 与 GameplayTagContainer
+local M = {}
+
+---@class mini_gas.GameplayTag
+---@field name string 标签完整名称
+local GameplayTag = {}
+GameplayTag.__index = GameplayTag
+
+---构造标签
+---@param tag mini_gas.TagId
+---@return mini_gas.GameplayTag
+function GameplayTag.new(tag)
+    return setmetatable({
+        name = tostring(tag),
+    }, GameplayTag)
+end
+
+---判断点分层级前缀关系
+---@param a string
+---@param b string
+---@return boolean
+local function tag_matches(a, b)
+    if a == b then
+        return true
+    end
+    -- a 是 b 的父级，或 b 是 a 的父级
+    return a:sub(1, #b + 1) == b .. "." or b:sub(1, #a + 1) == a .. "."
+end
+
+---判断自身是否匹配另一个标签（精确或父级）
+---@param other mini_gas.GameplayTag
+---@return boolean
+function GameplayTag:matches(other)
+    return tag_matches(self.name, other.name)
+end
+
+---@class mini_gas.GameplayTagContainer
+---@field tags table<string, mini_gas.GameplayTag>
+---@field counts table<string, table<string, number>> 按来源引用计数
+local GameplayTagContainer = {}
+GameplayTagContainer.__index = GameplayTagContainer
+
+---创建空容器
+---@return mini_gas.GameplayTagContainer
+function GameplayTagContainer.new()
+    return setmetatable({
+        tags = {},
+        counts = {},
+    }, GameplayTagContainer)
+end
+
+---添加标签（支持按来源引用计数）
+---@param tag mini_gas.TagId
+---@param source string|nil 来源标识，默认 "_explicit"
+function GameplayTagContainer:add(tag, source)
+    source = source or "_explicit"
+    local name = tostring(tag)
+    self.counts[name] = self.counts[name] or {}
+    self.counts[name][source] = (self.counts[name][source] or 0) + 1
+    if not self.tags[name] then
+        self.tags[name] = GameplayTag.new(tag)
+    end
+end
+
+---移除标签（按来源递减引用计数）
+---@param tag mini_gas.TagId
+---@param source string|nil 来源标识，默认 "_explicit"
+function GameplayTagContainer:remove(tag, source)
+    source = source or "_explicit"
+    local name = tostring(tag)
+    local counts = self.counts[name]
+    if not counts then
+        return
+    end
+    counts[source] = (counts[source] or 0) - 1
+    if counts[source] <= 0 then
+        counts[source] = nil
+    end
+    if not next(counts) then
+        self.tags[name] = nil
+        self.counts[name] = nil
+    end
+end
+
+---判断是否包含指定标签（支持父级匹配）
+---@param tag mini_gas.TagId
+---@return boolean
+function GameplayTagContainer:has(tag)
+    local query = GameplayTag.new(tag)
+    for _, stored in pairs(self.tags) do
+        if stored:matches(query) then
+            return true
+        end
+    end
+    return false
+end
+
+---判断是否包含任意一个标签
+---@param tags mini_gas.TagId[]
+---@return boolean
+function GameplayTagContainer:has_any(tags)
+    for _, tag in ipairs(tags or {}) do
+        if self:has(tag) then
+            return true
+        end
+    end
+    return false
+end
+
+---判断是否包含所有标签
+---@param tags mini_gas.TagId[]
+---@return boolean
+function GameplayTagContainer:has_all(tags)
+    for _, tag in ipairs(tags or {}) do
+        if not self:has(tag) then
+            return false
+        end
+    end
+    return true
+end
+
+M.GameplayTag = GameplayTag
+M.GameplayTagContainer = GameplayTagContainer
+
+return M
