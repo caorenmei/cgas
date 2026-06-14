@@ -41,11 +41,12 @@ describe("cgas.semantics.asc", function()
         assert.is_true(a:remove_ability(h))
     end)
 
-    it("applies and removes effects", function()
+    it("applies and removes duration effects", function()
         local a = new_asc()
         local HealthSet = { name = "HealthSet" }
         function HealthSet:on_init(set)
-            set:register_attribute("Health", 100, { max_value = 100 })
+            -- No max_value so the +5 modifier is observable.
+            set:register_attribute("Health", 100)
         end
         a:add_attribute_set(HealthSet)
 
@@ -63,13 +64,14 @@ describe("cgas.semantics.asc", function()
         ---@cast attr cgas.semantics.Attribute
         assert.equal(105, attr.current_value)
         assert.is_true(a:remove_active_effect(h))
+        assert.equal(100, attr.current_value)
     end)
 
-    it("updates active effects", function()
+    it("updates active effects and recalculates attributes", function()
         local a = new_asc()
         local HealthSet = { name = "HealthSet" }
         function HealthSet:on_init(set)
-            set:register_attribute("Health", 100, { max_value = 100 })
+            set:register_attribute("Health", 100)
         end
         a:add_attribute_set(HealthSet)
 
@@ -85,6 +87,80 @@ describe("cgas.semantics.asc", function()
         assert.is_not_nil(attr)
         ---@cast attr cgas.semantics.Attribute
         assert.equal(105, attr.current_value)
+    end)
+
+    it("applies instant effect to base value", function()
+        local a = new_asc()
+        local HealthSet = { name = "HealthSet" }
+        function HealthSet:on_init(set)
+            set:register_attribute("Health", 100)
+        end
+        a:add_attribute_set(HealthSet)
+
+        local Heal = effect.GameplayEffect.new({
+            name = "Heal",
+            duration_policy = "instant",
+            modifiers = { { attribute_name = "Health", op = "add", magnitude = 20 } },
+        })
+        a:apply_effect({ effect_class = Heal })
+        local attr = a:get_attribute("HealthSet.Health")
+        assert.is_not_nil(attr)
+        ---@cast attr cgas.semantics.Attribute
+        assert.equal(120, attr.base_value)
+        assert.equal(120, attr.current_value)
+    end)
+
+    it("recovers current value after duration effect expires", function()
+        local a = new_asc()
+        local HealthSet = { name = "HealthSet" }
+        function HealthSet:on_init(set)
+            set:register_attribute("Health", 100)
+        end
+        a:add_attribute_set(HealthSet)
+
+        local Regen = effect.GameplayEffect.new({
+            name = "Regen",
+            duration_policy = "duration",
+            duration = { type = "scalable_float", value = 1.0 },
+            modifiers = { { attribute_name = "Health", op = "add", magnitude = 5 } },
+        })
+        a:apply_effect({ effect_class = Regen })
+        local attr = a:get_attribute("HealthSet.Health")
+        assert.is_not_nil(attr)
+        ---@cast attr cgas.semantics.Attribute
+        assert.equal(105, attr.current_value)
+
+        a:update(1.1)
+        assert.equal(100, attr.current_value)
+    end)
+
+    it("aggregates modifiers from multiple active effects", function()
+        local a = new_asc()
+        local HealthSet = { name = "HealthSet" }
+        function HealthSet:on_init(set)
+            set:register_attribute("Health", 100)
+        end
+        a:add_attribute_set(HealthSet)
+
+        local Regen = effect.GameplayEffect.new({
+            name = "Regen",
+            duration_policy = "duration",
+            duration = { type = "scalable_float", value = 5.0 },
+            modifiers = { { attribute_name = "Health", op = "add", magnitude = 5 } },
+        })
+        local Buff = effect.GameplayEffect.new({
+            name = "Buff",
+            duration_policy = "duration",
+            duration = { type = "scalable_float", value = 5.0 },
+            modifiers = { { attribute_name = "Health", op = "multiply", magnitude = 2 } },
+        })
+        a:apply_effect({ effect_class = Regen })
+        a:apply_effect({ effect_class = Buff })
+        local attr = a:get_attribute("HealthSet.Health")
+        assert.is_not_nil(attr)
+        ---@cast attr cgas.semantics.Attribute
+        -- base 100 + add 5 = 105; then multiply 2 = 210
+        assert.equal(210, attr.current_value)
     end)
 
     it("destroys cleanly", function()

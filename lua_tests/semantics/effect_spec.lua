@@ -14,7 +14,7 @@ describe("cgas.semantics.effect", function()
         assert.equal("instant", e.duration_policy)
     end)
 
-    it("applies instant effect to attribute set", function()
+    it("applies instant effect to attribute base value", function()
         local set = attr.AttributeSet.new("HealthSet")
         set:register_attribute("Health", 100)
 
@@ -27,10 +27,10 @@ describe("cgas.semantics.effect", function()
         })
         local active = effect.ActiveGameplayEffect.new({ effect = e, target_set = set, level = 1 })
         active:apply_instant()
-        assert.equal(90, set:get("Health").current_value)
+        assert.equal(90, set:get("Health").base_value)
     end)
 
-    it("applies duration effect", function()
+    it("collects modifiers from duration effect", function()
         local set = attr.AttributeSet.new("HealthSet")
         set:register_attribute("Health", 100)
 
@@ -44,7 +44,11 @@ describe("cgas.semantics.effect", function()
         })
         local active = effect.ActiveGameplayEffect.new({ effect = e, target_set = set, level = 1 })
         active:on_apply()
-        assert.equal(105, set:get("Health").current_value)
+        local mods = active:collect_modifiers()
+        assert.equal(1, #mods)
+        assert.equal("Health", mods[1].attribute_name)
+        assert.equal("add", mods[1].op)
+        assert.equal(5, mods[1].magnitude)
     end)
 
     it("updates duration and expires", function()
@@ -65,7 +69,7 @@ describe("cgas.semantics.effect", function()
         assert.is_true(active:is_expired())
     end)
 
-    it("handles periodic effects", function()
+    it("applies periodic instant effect to attribute base value", function()
         local set = attr.AttributeSet.new("HealthSet")
         set:register_attribute("Health", 100)
 
@@ -82,9 +86,9 @@ describe("cgas.semantics.effect", function()
         local active = effect.ActiveGameplayEffect.new({ effect = e, target_set = set, level = 1 })
         active:on_apply()
         active:update(0.6)
-        assert.equal(90, set:get("Health").current_value)
+        assert.equal(90, set:get("Health").base_value)
         active:update(0.6)
-        assert.equal(80, set:get("Health").current_value)
+        assert.equal(80, set:get("Health").base_value)
     end)
 
     it("tracks stack count per active effect instance", function()
@@ -110,7 +114,7 @@ describe("cgas.semantics.effect", function()
         assert.is_false(a2:is_stack_at_limit())
     end)
 
-    it("resolves scalable_float magnitude", function()
+    it("resolves scalable_float magnitude for instant effect", function()
         local set = attr.AttributeSet.new("HealthSet")
         set:register_attribute("Health", 100)
 
@@ -123,10 +127,10 @@ describe("cgas.semantics.effect", function()
         })
         local active = effect.ActiveGameplayEffect.new({ effect = e, target_set = set, level = 1 })
         active:apply_instant()
-        assert.equal(115, set:get("Health").current_value)
+        assert.equal(115, set:get("Health").base_value)
     end)
 
-    it("resolves attribute_based magnitude", function()
+    it("resolves attribute_based magnitude for instant effect", function()
         local set = attr.AttributeSet.new("CombatSet")
         set:register_attribute("Strength", 10)
         set:register_attribute("Damage", 0)
@@ -140,6 +144,35 @@ describe("cgas.semantics.effect", function()
         })
         local active = effect.ActiveGameplayEffect.new({ effect = e, target_set = set, source_set = set, level = 1 })
         active:apply_instant()
-        assert.equal(50, set:get("Damage").current_value)
+        assert.equal(50, set:get("Damage").base_value)
+    end)
+
+    it("returns empty modifiers for instant effect", function()
+        local e = effect.GameplayEffect.new({
+            name = "Damage",
+            duration_policy = "instant",
+            modifiers = {
+                { attribute_name = "Health", op = "add", magnitude = -10 },
+            },
+        })
+        local active = effect.ActiveGameplayEffect.new({ effect = e, level = 1 })
+        local mods = active:collect_modifiers()
+        assert.equal(0, #mods)
+    end)
+
+    it("returns empty modifiers for periodic instant effect", function()
+        local e = effect.GameplayEffect.new({
+            name = "Poison",
+            duration_policy = "duration",
+            period = 1.0,
+            periodic_instant = true,
+            modifiers = {
+                { attribute_name = "Health", op = "add", magnitude = -5 },
+            },
+        })
+        local active = effect.ActiveGameplayEffect.new({ effect = e, level = 1 })
+        active:on_apply()
+        local mods = active:collect_modifiers()
+        assert.equal(0, #mods)
     end)
 end)
