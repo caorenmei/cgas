@@ -6,6 +6,7 @@ local effect_mod = require("mini_gas.effect")
 local ability_mod = require("mini_gas.ability")
 local event_mod = require("mini_gas.event")
 local task_mod = require("mini_gas.task")
+local tag_mod = require("mini_gas.tag")
 
 local M = {}
 
@@ -70,7 +71,7 @@ end
 ---@return number
 function M.get_base(state, attr)
     local a = state.attributes[attr]
-    return a and a:get_base() or 0
+    return a and attribute_mod.get_base(a) or 0
 end
 
 ---设置属性 Current 值
@@ -97,8 +98,8 @@ end
 local function collect_modifiers(state, attr_id)
     local mods = {}
     for _, effect in pairs(state.effects) do
-        if effect:is_active(state.tags) and effect:period_value() <= 0 then
-            for _, mod in ipairs(effect:active_modifiers()) do
+        if effect_mod.is_active(effect, state.tags) and effect_mod.period_value(effect) <= 0 then
+            for _, mod in ipairs(effect_mod.active_modifiers(effect)) do
                 if mod.def.attribute == attr_id then
                     table.insert(mods, mod)
                 end
@@ -127,11 +128,11 @@ end
 ---@param state mini_gas.EntityState
 ---@param tag mini_gas.TagId
 function M.add_tag(state, tag)
-    if not state.tags:has(tag) then
-        state.tags:add(tag, "_explicit")
+    if not tag_mod.has(state.tags, tag) then
+        tag_mod.add(state.tags, tag, "_explicit")
         event_mod.dispatch_event(state, enum.EGameplayEvent.TagAdded, { tag = tag })
     else
-        state.tags:add(tag, "_explicit")
+        tag_mod.add(state.tags, tag, "_explicit")
     end
 end
 
@@ -139,9 +140,9 @@ end
 ---@param state mini_gas.EntityState
 ---@param tag mini_gas.TagId
 function M.remove_tag(state, tag)
-    if state.tags:has(tag) then
-        state.tags:remove(tag, "_explicit")
-        if not state.tags:has(tag) then
+    if tag_mod.has(state.tags, tag) then
+        tag_mod.remove(state.tags, tag, "_explicit")
+        if not tag_mod.has(state.tags, tag) then
             event_mod.dispatch_event(state, enum.EGameplayEvent.TagRemoved, { tag = tag })
         end
     end
@@ -152,7 +153,7 @@ end
 ---@param tag mini_gas.TagId
 ---@return boolean
 function M.has_tag(state, tag)
-    return state.tags:has(tag)
+    return tag_mod.has(state.tags, tag)
 end
 
 ---派发事件
@@ -176,8 +177,8 @@ end
 ---@param tag mini_gas.TagId
 ---@param source string
 local function add_granted_tag(state, tag, source)
-    local had = state.tags:has(tag)
-    state.tags:add(tag, source)
+    local had = tag_mod.has(state.tags, tag)
+    tag_mod.add(state.tags, tag, source)
     if not had then
         event_mod.dispatch_event(state, enum.EGameplayEvent.TagAdded, { tag = tag, source = source })
     end
@@ -188,9 +189,9 @@ end
 ---@param tag mini_gas.TagId
 ---@param source string
 local function remove_granted_tag(state, tag, source)
-    local had = state.tags:has(tag)
-    state.tags:remove(tag, source)
-    if had and not state.tags:has(tag) then
+    local had = tag_mod.has(state.tags, tag)
+    tag_mod.remove(state.tags, tag, source)
+    if had and not tag_mod.has(state.tags, tag) then
         event_mod.dispatch_event(state, enum.EGameplayEvent.TagRemoved, { tag = tag, source = source })
     end
 end
@@ -319,7 +320,7 @@ function M.end_ability(state, ability_id)
     if not ability or not ability.is_active then
         return
     end
-    ability:end_ability(state)
+    ability_mod.end_ability(ability, state)
     event_mod.dispatch_event(state, enum.EGameplayEvent.AbilityEnded, { ability_id = ability_id })
 end
 
@@ -335,11 +336,11 @@ function M.try_activate_ability(state, ability_id, payload)
         return false
     end
 
-    if not ability:can_activate(state) then
+    if not ability_mod.can_activate(ability, state) then
         return false
     end
 
-    ability:activate(state, payload)
+    ability_mod.activate(ability, state, payload)
 
     -- 应用消耗
     if ability.spec.cost then
@@ -382,16 +383,16 @@ end
 ---@param state mini_gas.EntityState
 ---@param effect mini_gas.GameplayEffect
 local function apply_instant_modifiers(state, effect)
-    for _, mod in ipairs(effect:active_modifiers()) do
+    for _, mod in ipairs(effect_mod.active_modifiers(effect)) do
         local attr = state.attributes[mod.def.attribute]
         if not attr then
             modifier_mod.warn("Instant effect 目标 attribute 不存在: " .. tostring(mod.def.attribute))
             goto continue
         end
-        if not mod:is_active(state.tags) then
+        if not modifier_mod.is_active(mod, state.tags) then
             goto continue
         end
-        local val = mod:value()
+        local val = modifier_mod.value(mod)
         ---@cast val number
         local old = attr.current
         if mod.def.op == enum.EModifierOp.Add then
@@ -417,7 +418,7 @@ end
 local function apply_periodic_modifiers(state, effect, count)
     -- 按目标属性分组
     local groups = {}
-    for _, mod in ipairs(effect:active_modifiers()) do
+    for _, mod in ipairs(effect_mod.active_modifiers(effect)) do
         local id = mod.def.attribute
         groups[id] = groups[id] or {}
         table.insert(groups[id], mod)
@@ -480,7 +481,7 @@ function M.apply_effect(state, spec, level, stack)
 
     -- Instant 效果直接生效，不进入持续列表
     if spec.duration_policy == enum.EDurationPolicy.Instant then
-        if effect:is_active(state.tags) then
+        if effect_mod.is_active(effect, state.tags) then
             apply_instant_modifiers(state, effect)
         end
         event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = spec.id })
@@ -541,7 +542,7 @@ end
 ---@param dt number
 ---@return boolean 是否仍然存活
 local function update_effect(state, effect, dt)
-    if not effect:is_active(state.tags) then
+    if not effect_mod.is_active(effect, state.tags) then
         -- 挂起状态：仍然推进剩余时间，但不触发周期效果
         if effect.spec.duration_policy == enum.EDurationPolicy.HasDuration then
             effect.remaining = effect.remaining - dt
@@ -553,7 +554,7 @@ local function update_effect(state, effect, dt)
     end
 
     effect.elapsed = effect.elapsed + dt
-    local period = effect:period_value()
+    local period = effect_mod.period_value(effect)
     if period > 0 then
         local trigger_count = math.floor(effect.elapsed / period) - effect.last_trigger_count
         if trigger_count > 0 then

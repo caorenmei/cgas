@@ -4,14 +4,11 @@ local event_mod = require("mini_gas.event")
 
 local M = {}
 
-local GameplayTask = {}
-GameplayTask.__index = GameplayTask
-
 ---@param kind "delay"|"periodic"|"wait_event"
 ---@param opts table
 ---@return mini_gas.GameplayTask
 local function new_task(kind, opts)
-    return setmetatable({
+    return {
         kind = kind,
         remaining = opts.remaining or 0,
         interval = opts.interval or 0,
@@ -19,7 +16,7 @@ local function new_task(kind, opts)
         callback = opts.callback,
         repeat_count = opts.repeat_count,
         completed = false,
-    }, GameplayTask)
+    }
 end
 
 ---创建延时任务
@@ -124,12 +121,11 @@ function M.update_tasks(state, dt)
     end
 end
 
-M.GameplayTask = GameplayTask
-
--- 将工具函数也作为类静态方法暴露
-GameplayTask.delay = M.delay
-GameplayTask.periodic = M.periodic
-GameplayTask.wait_event = M.wait_event
-GameplayTask.register_task = M.register_task
+M.GameplayTask = {
+    delay = M.delay,
+    periodic = M.periodic,
+    wait_event = M.wait_event,
+    register_task = M.register_task,
+}
 
 return M

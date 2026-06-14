@@ -1,6 +1,7 @@
 --- 智取威虎山-献图 文本游戏 demo
 --- 基于 mini_gas 能力系统驱动
 local mini_gas = require("mini_gas")
+local ability_mod = require("mini_gas.ability")
 local EntityState = mini_gas.EntityState
 local MiniASC = mini_gas.MiniASC
 local EModifierOp = mini_gas.EModifierOp
@@ -285,7 +286,7 @@ function M.can_use_ability(state, ability_id)
     if not ability then
         return false
     end
-    return ability:can_activate(state)
+    return ability_mod.can_activate(ability, state)
 end
 
 ---@param state mini_gas.demo.weihu_shan.GameState

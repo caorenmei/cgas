@@ -1,5 +1,6 @@
 require("lua_tests.support.env")
 local mini_gas = require("mini_gas")
+local tag_mod = require("mini_gas.tag")
 local EModifierOp = mini_gas.EModifierOp
 local Modifier = mini_gas.Modifier
 local GameplayTagContainer = mini_gas.GameplayTagContainer
@@ -37,7 +38,7 @@ describe("mini_gas modifier", function()
 
     it("respects require_tags and forbid_tags", function()
         local container = GameplayTagContainer.new()
-        container:add("buff.attack")
+        tag_mod.add(container, "buff.attack")
 
         local mods = {
             Modifier.new({ attribute = "attr.attack", op = EModifierOp.Add, value = 50, require_tags = { "buff.attack" } }, 1),

@@ -1,30 +1,32 @@
 --- Modifier 与属性聚合逻辑
 --- 类型定义见 mini_gas.types
+--- Modifier 实例为无元表的纯数据表，操作通过模块级函数完成。
 local enum = require("mini_gas.enum")
+local tag_mod = require("mini_gas.tag")
 
 local M = {}
 
-local Modifier = {}
-Modifier.__index = Modifier
+M.Modifier = {}
 
 ---@param def mini_gas.ModifierDef
 ---@param level number
 ---@param source any
 ---@param stack number|nil
 ---@return mini_gas.Modifier
-function Modifier.new(def, level, source, stack)
-    return setmetatable({
+function M.Modifier.new(def, level, source, stack)
+    return {
         def = def,
         level = level or 1,
         source = source,
         stack = stack,
-    }, Modifier)
+    }
 end
 
 ---获取当前等级下的实际数值或复合函数
+---@param mod mini_gas.Modifier
 ---@return number|fun(v: number): number
-function Modifier:value()
-    local v = self.def.value
+function M.value(mod)
+    local v = mod.def.value
     if type(v) == "number" then
         return v
     end
@@ -32,22 +34,23 @@ function Modifier:value()
         return v
     end
     if type(v) == "table" and v.value_at then
-        return v:value_at(self.level)
+        return v:value_at(mod.level)
     end
     M.warn("非法 Modifier 数值类型: " .. tostring(v))
     return 0
 end
 
 ---判断 Modifier 是否满足标签约束
+---@param mod mini_gas.Modifier
 ---@param container mini_gas.GameplayTagContainer|nil
 ---@return boolean
-function Modifier:is_active(container)
+function M.is_active(mod, container)
     if not container then
         return true
     end
-    local req = self.def.require_tags or {}
-    local forbid = self.def.forbid_tags or {}
-    return container:has_all(req) and not container:has_any(forbid)
+    local req = mod.def.require_tags or {}
+    local forbid = mod.def.forbid_tags or {}
+    return tag_mod.has_all(container, req) and not tag_mod.has_any(container, forbid)
 end
 
 ---记录警告
@@ -73,7 +76,7 @@ function M.calc_attribute(base, modifiers, container)
             goto continue
         end
 
-        if not mod:is_active(container) then
+        if not M.is_active(mod, container) then
             goto continue
         end
 
@@ -81,7 +84,7 @@ function M.calc_attribute(base, modifiers, container)
         if op == enum.EModifierOp.Compound then
             table.insert(compounds, { fn = mod.def.value, priority = mod.def.priority or 0 })
         else
-            local val = mod:value()
+            local val = M.value(mod)
             ---@cast val number
             if mod.stack and op == enum.EModifierOp.Add then
                 val = val * mod.stack
@@ -127,7 +130,5 @@ function M.calc_attribute(base, modifiers, container)
 
     return result
 end
-
-M.Modifier = Modifier
 
 return M

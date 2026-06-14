@@ -1,22 +1,25 @@
 --- GameplayAbility 与 AbilitySpec
 --- 类型定义见 mini_gas.types
+--- GameplayAbility 实例为无元表的纯数据表，操作通过模块级函数完成。
+local attribute_mod = require("mini_gas.attribute")
+local tag_mod = require("mini_gas.tag")
+
 local M = {}
 
-local GameplayAbility = {}
-GameplayAbility.__index = GameplayAbility
+M.GameplayAbility = {}
 
 ---@param spec mini_gas.GameplayAbilityDef
 ---@param level number
 ---@param stack number|nil
 ---@return mini_gas.GameplayAbility
-function GameplayAbility.new(spec, level, stack)
-    return setmetatable({
+function M.GameplayAbility.new(spec, level, stack)
+    return {
         spec = spec,
         level = level or 1,
         stack = stack or 1,
         is_active = false,
         cooldown_remaining = 0,
-    }, GameplayAbility)
+    }
 end
 
 ---解析数值（可能是常量或成长曲线）
@@ -34,39 +37,40 @@ local function resolve_value(value, level)
 end
 
 ---检查当前是否可以激活
+---@param ability mini_gas.GameplayAbility
 ---@param state mini_gas.EntityState
 ---@return boolean
-function GameplayAbility:can_activate(state)
-    if self.is_active then
+function M.can_activate(ability, state)
+    if ability.is_active then
         return false
     end
-    if self.cooldown_remaining > 0 then
+    if ability.cooldown_remaining > 0 then
         return false
     end
 
     local container = state.tags
-    local req = self.spec.require_tags or {}
-    local forbid = self.spec.forbid_tags or {}
-    if not container:has_all(req) or container:has_any(forbid) then
+    local req = ability.spec.require_tags or {}
+    local forbid = ability.spec.forbid_tags or {}
+    if not tag_mod.has_all(container, req) or tag_mod.has_any(container, forbid) then
         return false
     end
 
     -- 消耗检查
-    if self.spec.cost then
-        for attr_id, cost_value in pairs(self.spec.cost) do
+    if ability.spec.cost then
+        for attr_id, cost_value in pairs(ability.spec.cost) do
             local attr = state.attributes[attr_id]
             if not attr then
                 return false
             end
-            local need = resolve_value(cost_value, self.level)
-            if attr:get_current() < need then
+            local need = resolve_value(cost_value, ability.level)
+            if attribute_mod.get_current(attr) < need then
                 return false
             end
         end
     end
 
-    if self.spec.can_activate then
-        local ok = self.spec.can_activate(state, nil)
+    if ability.spec.can_activate then
+        local ok = ability.spec.can_activate(state, nil)
         if ok == false then
             return false
         end
@@ -76,23 +80,24 @@ function GameplayAbility:can_activate(state)
 end
 
 ---激活技能
+---@param ability mini_gas.GameplayAbility
 ---@param _state mini_gas.EntityState
 ---@param _payload table|nil
-function GameplayAbility:activate(_state, _payload)
+function M.activate(ability, _state, _payload)
     _ = _state
     _ = _payload
-    self.is_active = true
+    ability.is_active = true
 end
 
 ---结束技能
+---@param ability mini_gas.GameplayAbility
 ---@param _state mini_gas.EntityState
-function GameplayAbility:end_ability(_state)
+function M.end_ability(ability, _state)
     _ = _state
-    self.is_active = false
-    self.cooldown_remaining = resolve_value(self.spec.cooldown, self.level)
+    ability.is_active = false
+    ability.cooldown_remaining = resolve_value(ability.spec.cooldown, ability.level)
 end
 
-M.GameplayAbility = GameplayAbility
 M.resolve_value = resolve_value
 
 return M

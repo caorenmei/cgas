@@ -1196,7 +1196,7 @@ function mini_gas.make_growth_curve(base, params, formula) end
 11. **策划 Alias 映射**：所有业务 ID（属性、标签、技能、效果、事件）的 `alias` 类型为 `string | integer`，由策划配置并通过 `ConfigAdapter` 映射到项目级 `@enum`；框架层不硬编码业务常量。
 12. **公式化成长**：`GrowthCurve` 必须基于公式计算，禁止等级查表；公式由业务方提供，支持线性、指数、对数、分段等任意形式。
 13. **标签驱动加成**：优先通过 `Granted Tag` 与 `Require / Block Tag` 实现效果的赋予与条件生效，避免引入额外的跨实体链接机制。
-14. **配置与状态无元表**：所有配置对象（Spec / Def / GrowthCurve）与运行时状态（EntityState / WorldState）均使用无元表的普通 Lua 表，便于外部配置桥接、序列化与持久化；MiniGas 内部运行时对象（Attribute / Modifier / GameplayEffect / GameplayAbility / GameplayTag / GameplayTask）可使用元表简化实现。
+14. **配置与状态无元表**：所有配置对象（Spec / Def / GrowthCurve）、运行时状态（EntityState / WorldState）以及运行时数据对象（Attribute / Modifier / GameplayEffect / GameplayAbility / GameplayTag / GameplayTagContainer / GameplayTask）的实例均使用无元表的普通 Lua 表，便于外部配置桥接、序列化与持久化；相关操作通过模块级函数完成。
 15. **类型集中定义**：所有 LuaCATS 类型定义集中于 `types.lua`，业务与框架模块通过引用这些类型获得静态检查。
 
 ---
