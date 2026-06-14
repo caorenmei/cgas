@@ -57,12 +57,12 @@ local mini_gas = require("mini_gas")
 | 方法 | 说明 |
 |------|------|
 | `MiniASC.register_attributes(state, defs, attr_defs)` | 批量注册属性定义到 `defs` 并初始化 `state.attributes` |
-| `MiniASC.give_ability(state, defs, spec, level, stack?)` | 授予技能 |
+| `MiniASC.give_ability(state, defs, ability_def, level?, stack?)` | 授予技能 |
 | `MiniASC.remove_ability(state, ability_id)` | 移除技能 |
 | `MiniASC.set_ability_level(state, ability_id, level)` | 设置技能等级 |
 | `MiniASC.set_ability_stack(state, ability_id, stack)` | 设置技能 Stack |
 | `MiniASC.try_activate_ability(state, defs, ability_id, payload?)` | 尝试激活技能 |
-| `MiniASC.apply_effect(state, defs, spec, level, stack?)` | 应用效果 |
+| `MiniASC.apply_effect(state, defs, effect_def, level?, stack?)` | 应用效果 |
 | `MiniASC.remove_effect(state, effect_id)` | 移除效果 |
 | `MiniASC.set_effect_level(state, effect_id, level)` | 设置效果等级 |
 | `MiniASC.set_effect_stack(state, effect_id, stack)` | 设置效果 Stack |

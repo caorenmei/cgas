@@ -53,14 +53,6 @@ local function resolve(value, self)
     return ability_mod.resolve_value(value, self)
 end
 
----判断对象是否为 AbilitySpec/EffectSpec/AttributeSpec
----Spec 以 def_id 为标识，而 Def 以 id/name 为标识
----@param obj any
----@return boolean
-local function is_spec(obj)
-    return type(obj) == "table" and obj.def_id ~= nil and obj.id == nil and obj.name == nil
-end
-
 ---派发属性变化事件
 ---@param state mini_gas.EntityState
 ---@param attr_id mini_gas.AttributeId
@@ -74,28 +66,14 @@ local function notify_attr_changed(state, attr_id, old_value, new_value)
     })
 end
 
----注册属性定义（支持 AttributeDef 或 AttributeSpec 混合）
+---注册属性定义
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
----@param attr_defs mini_gas.AttributeDef[]|mini_gas.AttributeSpec[]
+---@param attr_defs mini_gas.AttributeDef[]
 function M.register_attributes(state, defs, attr_defs)
-    for _, item in ipairs(attr_defs or {}) do
-        local def
-        if is_spec(item) then
-            ---@cast item mini_gas.AttributeSpec
-            def = defs.attribute_defs[item.def_id]
-            if not def then
-                log_mod.warn("register_attributes: attribute def not found: " .. tostring(item.def_id))
-                goto continue
-            end
-            -- AttributeSpec.level 目前仅作为元信息保留，base 值仍由 AttributeDef.base 决定
-        else
-            ---@cast item mini_gas.AttributeDef
-            def = item
-        end
+    for _, def in ipairs(attr_defs or {}) do
         defs.attribute_defs[def.name] = def
         state.attributes[def.name] = attribute_mod.calc_base(def)
-        ::continue::
     end
 end
 
@@ -241,30 +219,15 @@ local function remove_granted_tags(state, tags, source)
     end
 end
 
----授予技能（支持 GameplayAbilityDef 或 AbilitySpec）
+---授予技能
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
----@param ability_def_or_spec mini_gas.GameplayAbilityDef|mini_gas.AbilitySpec
+---@param ability_def mini_gas.GameplayAbilityDef
 ---@param level number?
 ---@param stack number?
-function M.give_ability(state, defs, ability_def_or_spec, level, stack)
-    local ability_def
-    if is_spec(ability_def_or_spec) then
-        ---@cast ability_def_or_spec mini_gas.AbilitySpec
-        ability_def = defs.ability_defs[ability_def_or_spec.def_id]
-        if not ability_def then
-            log_mod.warn("give_ability: ability def not found: " .. tostring(ability_def_or_spec.def_id))
-            return
-        end
-        level = ability_def_or_spec.level or level or 1
-        stack = ability_def_or_spec.stack or stack or 1
-    else
-        ---@cast ability_def_or_spec mini_gas.GameplayAbilityDef
-        ability_def = ability_def_or_spec
-        level = level or 1
-        stack = stack or 1
-    end
-
+function M.give_ability(state, defs, ability_def, level, stack)
+    level = level or 1
+    stack = stack or 1
     local key = ability_key(ability_def.id)
     if state.abilities[key] then
         return
@@ -499,30 +462,15 @@ local function apply_periodic_modifiers(state, defs, effect, count)
     end
 end
 
----应用效果（支持 EffectDef 或 EffectSpec）
+---应用效果
 ---@param state mini_gas.EntityState
 ---@param defs mini_gas.Defs
----@param effect_def_or_spec mini_gas.EffectDef|mini_gas.EffectSpec
+---@param effect_def mini_gas.EffectDef
 ---@param level number?
 ---@param stack number?
-function M.apply_effect(state, defs, effect_def_or_spec, level, stack)
-    local effect_def
-    if is_spec(effect_def_or_spec) then
-        ---@cast effect_def_or_spec mini_gas.EffectSpec
-        effect_def = defs.effect_defs[effect_def_or_spec.def_id]
-        if not effect_def then
-            log_mod.warn("apply_effect: effect def not found: " .. tostring(effect_def_or_spec.def_id))
-            return
-        end
-        level = effect_def_or_spec.level or level or 1
-        stack = effect_def_or_spec.stack or stack or 1
-    else
-        ---@cast effect_def_or_spec mini_gas.EffectDef
-        effect_def = effect_def_or_spec
-        level = level or 1
-        stack = stack or 1
-    end
-
+function M.apply_effect(state, defs, effect_def, level, stack)
+    level = level or 1
+    stack = stack or 1
     local key = effect_key(effect_def.id)
     defs.effect_defs[effect_def.id] = effect_def
 
