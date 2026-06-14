@@ -5,9 +5,15 @@
 
 `mini-gas` 仅依赖 Lua 标准库，不依赖任何外部 GAS 库或第三方库。所有类型、工具函数均在 `lua_lib/mini_gas` 内自包含。
 
-### 3.2 Spec 驱动成长
+### 3.2 Level / Stack 驱动成长
 
-游戏中的英雄、技能、装备、Buff 都具有成长性。`mini-gas` 通过 **Spec** 描述这些对象的等级、Stack、成长公式，运行时由 `MiniASC` 根据 Spec 实例化并更新。
+游戏中的英雄、技能、装备、Buff 都具有成长性。`mini-gas` 的成长性由运行时实例的 `level` / `stack` 与配置 `Def` 中的公式函数共同描述：
+
+- `AbilityDef.cooldown` / `AbilityDef.cost[attr]`：`fun(self: GameplayAbility): number`
+- `EffectDef.duration` / `EffectDef.period`：`fun(self: GameplayEffect): number`
+- `ModifierDef.value`（Compound）：`fun(self: Modifier, v: number): number`
+
+`MiniASC` 在实例化时将传入的 `level` / `stack` 写入运行时实例，公式函数读取这些字段完成数值计算。
 
 ### 3.3 无魔术字符串
 
@@ -42,10 +48,10 @@ mindmap
       不依赖外部 GAS 库
       不依赖第三方库
       仅 Lua 标准库
-    Spec 驱动成长
-      AbilitySpec
-      EffectSpec
-      AttributeSpec
+    Level / Stack 驱动成长
+      GameplayAbility.level/stack
+      GameplayEffect.level/stack
+      Modifier.level/stack
       按类型公式函数
     无魔术字符串
       idAliasText["alias: string | integer"]
@@ -108,9 +114,6 @@ mindmap
       AttributeDef
       GameplayTagContainer
       GameplayTask
-      AbilitySpec
-      EffectSpec
-      AttributeSpec
     idAlias["@alias"]
       TagId
       AttributeId

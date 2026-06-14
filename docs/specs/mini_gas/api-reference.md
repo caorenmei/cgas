@@ -15,7 +15,6 @@ lua_lib/
     ├── tag.lua                    -- GameplayTagContainer 与标签匹配
     ├── event.lua                  -- GameplayEvent 派发与监听
     ├── task.lua                   -- GameplayTask 轻量异步任务
-    ├── spec.lua                   -- Spec 构造器
     └── enum.lua                   -- 所有枚举常量定义（@enum）
 ```
 

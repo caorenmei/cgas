@@ -29,33 +29,33 @@ local function initial_remaining(duration_policy)
     return math.huge
 end
 
----@param spec mini_gas.EffectDef
+---@param def mini_gas.EffectDef
 ---@param level number
 ---@param stack number|nil
 ---@return mini_gas.GameplayEffect
-function M.GameplayEffect.new(spec, level, stack)
+function M.GameplayEffect.new(def, level, stack)
     level = level or 1
     stack = stack or 1
     local effect = {
-        id = spec.id,
-        alias = spec.alias,
-        duration_policy = spec.duration_policy,
-        duration = spec.duration,
-        period = spec.period,
-        stacking = spec.stacking,
-        max_stack = spec.max_stack,
-        granted_tags = copy_array(spec.granted_tags),
-        require_tags = copy_array(spec.require_tags),
-        blocked_tags = copy_array(spec.blocked_tags),
-        source = spec.source,
+        id = def.id,
+        alias = def.alias,
+        duration_policy = def.duration_policy,
+        duration = def.duration,
+        period = def.period,
+        stacking = def.stacking,
+        max_stack = def.max_stack,
+        granted_tags = copy_array(def.granted_tags),
+        require_tags = copy_array(def.require_tags),
+        blocked_tags = copy_array(def.blocked_tags),
+        source = def.source,
         level = level,
         stack = stack,
         elapsed = 0,
-        remaining = initial_remaining(spec.duration_policy),
+        remaining = initial_remaining(def.duration_policy),
         last_trigger_count = 0,
         modifiers = {},
     }
-    for i, mod_def in ipairs(spec.modifiers or {}) do
+    for i, mod_def in ipairs(def.modifiers or {}) do
         effect.modifiers[i] = modifier_mod.Modifier.new(mod_def, level, effect, stack)
     end
     return effect

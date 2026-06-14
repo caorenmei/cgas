@@ -19,7 +19,6 @@
 | [core-mechanisms.md](./core-mechanisms.md) | Tag、Attribute、Modifier、Effect、Ability、Event、Task 机制概览 |
 | [event.md](./event.md) | GameplayEvent 事件系统 |
 | [task.md](./task.md) | GameplayTask 轻量任务 |
-| [spec-system.md](./spec-system.md) | Spec 系统与成长性 |
 | [config-bridge.md](./config-bridge.md) | 配置桥接设计 |
 | [api-reference.md](./api-reference.md) | 目录结构与 API 参考 |
 | [implementation-notes.md](./implementation-notes.md) | 实现要点与版本历史 |
@@ -41,13 +40,13 @@ Gameplay Ability System（GAS）参考 Unreal Engine 的设计思想，覆盖 Ab
 - 支持冷却、消耗、Stack、等级缩放。
 - **代码自包含**，避免与外部 GAS 实现相互污染，便于独立演进与维护。
 
-因此设计 `mini-gas` v2.0：在保留 GAS 核心思想（Ability / Tag / Effect / Modifier / Attribute）的同时，构建一个**自包含、Spec 驱动、面向成长**的轻量服务端 GAS 引擎。
+因此设计 `mini-gas` v2.0：在保留 GAS 核心思想（Ability / Tag / Effect / Modifier / Attribute）的同时，构建一个**自包含、面向成长**的轻量服务端 GAS 引擎。
 
 ### 1.2 目标
 
 - **核心子系统**：具备 GameplayAbility、GameplayTag、GameplayEffect、Modifier、Attribute 等核心能力。
 - **代码独立**：目录独立为 `lua_lib/mini_gas`，不依赖任何外部 GAS 实现或共享源码文件。
-- **Spec 驱动成长**：所有可成长对象（Ability / Effect / Attribute）均通过 Spec 定义，支持等级、Stack、按类型公式函数。
+- **Level / Stack 驱动成长**：Ability / Effect / Modifier 的运行时实例携带 `level` / `stack`，Def 中的公式函数读取这些字段完成数值缩放。
 - **无魔术字符串**：所有标识符、标签、属性名、操作类型均通过 `@enum` 常量或 `@class` 类型定义，禁止在业务代码中直接书写字面量。
 - **状态完全自包含**：运行时状态对象不引用任何外部对象（包括配置 Def、下划线查找表），可直接序列化与网络同步。
 - **Defs 分离**：配置定义集中存放在 `Defs` 表中，由调用方持有并在需要的 API 中传入。
@@ -70,7 +69,6 @@ Gameplay Ability System（GAS）参考 Unreal Engine 的设计思想，覆盖 Ab
 | GameplayEvent（游戏事件） | 技能与效果之间的触发/监听机制 |
 | GameplayTask（轻量任务） | 延时、周期、等待事件等轻量异步任务 |
 | Defs（配置定义表） | 集中存放 AttributeDef / AbilityDef / EffectDef |
-| Spec 系统 | AbilitySpec、EffectSpec、AttributeSpec，支持等级、Stack、按类型公式 |
 | ConfigAdapter（配置适配器） | 将外部配置转换为 Def 的桥梁 |
 
 ```mermaid
@@ -87,10 +85,6 @@ mindmap
       attribute_defs
       ability_defs
       effect_defs
-    Spec
-      AbilitySpec
-      EffectSpec
-      AttributeSpec
     ConfigAdapter
       Excel
       JSON

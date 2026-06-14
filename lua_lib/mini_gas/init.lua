@@ -1,7 +1,6 @@
 --- mini-gas v2.0 模块入口
 --- 类型定义集中管理于 mini_gas.types
 local enum = require("mini_gas.enum")
-local spec = require("mini_gas.spec")
 local tag = require("mini_gas.tag")
 local modifier = require("mini_gas.modifier")
 local effect = require("mini_gas.effect")
@@ -25,9 +24,6 @@ M.EEffectId = enum.EEffectId
 M.EGameplayEvent = enum.EGameplayEvent
 
 -- 类型构造器
-M.AbilitySpec = spec.AbilitySpec
-M.EffectSpec = spec.EffectSpec
-M.AttributeSpec = spec.AttributeSpec
 M.GameplayTagContainer = tag.GameplayTagContainer
 M.Modifier = modifier.Modifier
 M.GameplayEffect = effect.GameplayEffect

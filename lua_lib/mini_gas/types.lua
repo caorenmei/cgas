@@ -134,20 +134,6 @@
 ---@class mini_gas.WorldState
 ---@field entities table<string, mini_gas.EntityState>
 
----@class mini_gas.AbilitySpec
----@field def_id mini_gas.AbilityId
----@field level number
----@field stack number
-
----@class mini_gas.EffectSpec
----@field def_id mini_gas.EffectId
----@field level number
----@field stack number
-
----@class mini_gas.AttributeSpec
----@field def_id mini_gas.AttributeId
----@field level number
-
 ---@alias mini_gas.ConfigAdapter fun(raw_config: any): mini_gas.GameplayAbilityDef|mini_gas.EffectDef|mini_gas.AttributeDef
 
 -- 占位返回

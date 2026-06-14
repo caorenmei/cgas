@@ -28,26 +28,26 @@ local function shallow_copy(t)
     return result
 end
 
----@param spec mini_gas.GameplayAbilityDef
+---@param def mini_gas.GameplayAbilityDef
 ---@param level number
 ---@param stack number|nil
 ---@return mini_gas.GameplayAbility
-function M.GameplayAbility.new(spec, level, stack)
+function M.GameplayAbility.new(def, level, stack)
     level = level or 1
     stack = stack or 1
     return {
-        id = spec.id,
-        alias = spec.alias,
-        activation_policy = spec.activation_policy,
-        cooldown = spec.cooldown,
-        cost = shallow_copy(spec.cost),
-        require_tags = copy_array(spec.require_tags),
-        blocked_tags = copy_array(spec.blocked_tags),
-        grant_tags = copy_array(spec.grant_tags),
-        activation_event = spec.activation_event,
-        effects = copy_array(spec.effects),
-        can_activate = spec.can_activate,
-        source = spec.source,
+        id = def.id,
+        alias = def.alias,
+        activation_policy = def.activation_policy,
+        cooldown = def.cooldown,
+        cost = shallow_copy(def.cost),
+        require_tags = copy_array(def.require_tags),
+        blocked_tags = copy_array(def.blocked_tags),
+        grant_tags = copy_array(def.grant_tags),
+        activation_event = def.activation_event,
+        effects = copy_array(def.effects),
+        can_activate = def.can_activate,
+        source = def.source,
         level = level,
         stack = stack,
         is_active = false,

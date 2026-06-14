@@ -294,25 +294,7 @@ function ability_mod.end_ability(ability) end
 function mini_gas.register_entity(world, id, state) end
 ```
 
-#### 5.3.9 Spec 封装
-
-```lua
----@class mini_gas.AbilitySpec
----@field def_id mini_gas.AbilityId
----@field level number
----@field stack number
-
----@class mini_gas.EffectSpec
----@field def_id mini_gas.EffectId
----@field level number
----@field stack number
-
----@class mini_gas.AttributeSpec
----@field def_id mini_gas.AttributeId
----@field level number
-```
-
-#### 5.3.10 能力系统组件
+#### 5.3.9 能力系统组件
 
 `MiniASC` 是**无状态**的函数集合。需要读取或注册 Def 的操作接收 `defs` 作为第二个参数；其余操作保持简洁签名。
 
