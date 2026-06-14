@@ -7,14 +7,14 @@
 ## 目录结构
 
 ```
-cgameplay/
+cgas/
 ├── docs/                    # 项目文档
 │   ├── books/               # 第三方库中文文档
 │   └── specs/               # 功能规格说明
-├── lua_lib/                 # 核心库代码，按功能模块划分子目录
-├── lua_metas/               # 预留：LuaCATS 类型定义
+├── lua_lib/                 # 核心库代码，按功能模块划分子目录（已创建）
+├── lua_metas/               # 预留：LuaCATS 类型定义目录
 ├── lua_tests/               # 测试代码，测试文件以 `*_spec.lua` 命名
-├── lua_tools/               # Lua 工具脚本
+├── lua_tools/               # 预留：Lua 工具脚本目录
 ├── AGENTS.md                # 项目开发规范
 ├── CLAUDE.md                # Claude 开发指令
 ├── *.rockspec               # LuaRocks 包配置
@@ -33,10 +33,10 @@ cgameplay/
 
 ## 开发工作流
 
-- **Git Worktree**：@git-worktree-manager 使用 `git worktree` 管理多分支并行开发，避免切换分支导致的环境重建。
+- **Git Worktree**：使用 `git worktree` 管理多分支并行开发，避免切换分支导致的环境重建。
   - 主工作区保持 `main` 分支。
   - 各 worktree 独立运行，互不干扰。
-  - 详细流程见 skill。
+  - worktree 目录统一放在 `.worktrees/` 下。
 
 - **TDD**：新功能、Bug 修复、重构均遵循红-绿-重构循环。先写失败的测试，再写最小实现使其通过，最后重构。
 - **静态诊断**：提交前运行 `lua-language-server --check . --configpath .luarc.json`，确保无诊断问题。
