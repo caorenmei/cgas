@@ -121,6 +121,22 @@ describe("mini_gas effect", function()
         assert.equal(130, MiniASC.get_current(state, defs, EAttribute.Attack))
     end)
 
+    it("instant effect supports compound modifier", function()
+        local state = EntityState.new()
+        local defs = Defs.new()
+        MiniASC.register_attributes(state, defs, {
+            { name = EAttribute.Hp, base = 100, min = 0 },
+        })
+        MiniASC.apply_effect(state, defs, {
+            id = EEffectId.Heal,
+            duration_policy = EDurationPolicy.Instant,
+            modifiers = {
+                { attribute = EAttribute.Hp, op = EModifierOp.Compound, value = function(_, v) return v * 2 end },
+            },
+        }, 1, 1)
+        assert.equal(200, MiniASC.get_current(state, defs, EAttribute.Hp))
+    end)
+
     it("stacking Refresh refreshes duration", function()
         local state = EntityState.new()
         local defs = Defs.new()

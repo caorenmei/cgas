@@ -123,6 +123,29 @@ describe("mini_gas ability", function()
         assert.is_false(MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball))
     end)
 
+    it("passes payload to can_activate callback", function()
+        local state = EntityState.new()
+        local defs = Defs.new()
+        local received_payload
+        MiniASC.register_attributes(state, defs, {
+            { name = EAttribute.Hp, base = 100, min = 0 },
+        })
+        MiniASC.give_ability(state, defs, {
+            id = EAbilityId.Fireball,
+            activation_policy = EAbilityActivationPolicy.Active,
+            cooldown = 0,
+            cost = {},
+            can_activate = function(_, payload)
+                received_payload = payload
+                return true
+            end,
+            effects = {},
+        }, 1, 1)
+        local payload = { reason = "test" }
+        MiniASC.try_activate_ability(state, defs, EAbilityId.Fireball, payload)
+        assert.equal("test", received_payload.reason)
+    end)
+
     it("reactive ability triggers on event", function()
         local state = EntityState.new()
         local defs = Defs.new()

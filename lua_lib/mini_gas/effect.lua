@@ -64,16 +64,19 @@ function M.period_value(effect)
     return 0
 end
 
----判断效果是否满足标签约束
+---判断效果是否满足标签约束（避免与能力 is_active 状态字段混淆）
 ---@param state mini_gas.EntityState
 ---@param effect mini_gas.GameplayEffect
 ---@return boolean
-function M.is_active(state, effect)
+function M.meets_tag_requirements(state, effect)
     local container = state.tags
     local req = effect.require_tags or {}
     local blocked = effect.blocked_tags or {}
     return tag_mod.has_all(container, req) and not tag_mod.has_any(container, blocked)
 end
+
+---@deprecated 使用 meets_tag_requirements
+M.is_active = M.meets_tag_requirements
 
 ---获取当前 Modifier 列表
 ---@param effect mini_gas.GameplayEffect

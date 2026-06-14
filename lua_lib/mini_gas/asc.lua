@@ -110,7 +110,7 @@ end
 local function collect_modifiers(state, attr_id)
     local mods = {}
     for _, effect in pairs(state.effects) do
-        if effect_mod.is_active(state, effect) and effect_mod.period_value(effect) <= 0 then
+        if effect_mod.meets_tag_requirements(state, effect) and effect_mod.period_value(effect) <= 0 then
             for _, mod in ipairs(effect_mod.active_modifiers(effect)) do
                 if mod.attribute == attr_id then
                     mods[#mods + 1] = mod
@@ -354,7 +354,7 @@ function M.try_activate_ability(state, defs, ability_id, payload)
         return false
     end
 
-    if not ability_mod.can_activate(state, ability) then
+    if not ability_mod.can_activate(state, ability, payload) then
         return false
     end
 
@@ -406,22 +406,34 @@ local function apply_instant_modifiers(state, defs, effect)
             log_mod.warn("Instant effect 目标 attribute 不存在: " .. tostring(attr_id))
             goto continue
         end
-        local val = mod.value
-        if type(val) == "function" then
-            log_mod.warn("Instant effect 不支持 Compound Modifier")
-            goto continue
-        end
-        ---@cast val number
         local old = state.attributes[attr_id] or 0
-        if mod.op == enum.EModifierOp.Add then
-            state.attributes[attr_id] = clamp_attr(defs, attr_id, old + val)
-        elseif mod.op == enum.EModifierOp.Multiply then
-            state.attributes[attr_id] = clamp_attr(defs, attr_id, old * val)
-        elseif mod.op == enum.EModifierOp.Override then
-            state.attributes[attr_id] = clamp_attr(defs, attr_id, val)
+        local new_value
+        local val = mod.value
+        if mod.op == enum.EModifierOp.Compound then
+            if type(val) == "function" then
+                new_value = val(mod, old)
+            else
+                log_mod.warn("Compound Modifier 的 value 必须是函数")
+                goto continue
+            end
         else
-            log_mod.warn("Instant effect 不支持 Compound Modifier")
+            if type(val) == "function" then
+                log_mod.warn("Instant effect 非 Compound Modifier 不支持函数 value")
+                goto continue
+            end
+            ---@cast val number
+            if mod.op == enum.EModifierOp.Add then
+                new_value = old + val
+            elseif mod.op == enum.EModifierOp.Multiply then
+                new_value = old * val
+            elseif mod.op == enum.EModifierOp.Override then
+                new_value = val
+            else
+                log_mod.warn("Instant effect 遇到未知 Modifier 操作: " .. tostring(mod.op))
+                goto continue
+            end
         end
+        state.attributes[attr_id] = clamp_attr(defs, attr_id, new_value)
         if old ~= state.attributes[attr_id] then
             notify_attr_changed(state, attr_id, old, state.attributes[attr_id])
         end
@@ -507,7 +519,7 @@ function M.apply_effect(state, defs, spec, level, stack)
     end
 
     if effect.duration_policy == enum.EDurationPolicy.Instant then
-        if effect_mod.is_active(state, effect) then
+        if effect_mod.meets_tag_requirements(state, effect) then
             apply_instant_modifiers(state, defs, effect)
         end
         event_mod.dispatch_event(state, enum.EGameplayEvent.EffectApplied, { effect_id = spec.id })
@@ -574,7 +586,7 @@ end
 ---@param dt number
 ---@return boolean 是否仍然存活
 local function update_effect(state, defs, effect, dt)
-    if not effect_mod.is_active(state, effect) then
+    if not effect_mod.meets_tag_requirements(state, effect) then
         if effect.duration_policy == enum.EDurationPolicy.HasDuration then
             effect.remaining = effect.remaining - dt
             if effect.remaining <= 0 then

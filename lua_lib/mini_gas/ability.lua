@@ -73,8 +73,9 @@ end
 ---检查当前是否可以激活
 ---@param state mini_gas.EntityState
 ---@param ability mini_gas.GameplayAbility
+---@param payload table|nil
 ---@return boolean
-function M.can_activate(state, ability)
+function M.can_activate(state, ability, payload)
     if ability.is_active then
         return false
     end
@@ -100,7 +101,7 @@ function M.can_activate(state, ability)
     end
 
     if ability.can_activate then
-        local ok = ability.can_activate(state, nil)
+        local ok = ability.can_activate(state, payload)
         if ok == false then
             return false
         end
