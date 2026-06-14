@@ -16,7 +16,9 @@
 | [README.md](./README.md) | 背景、目标、范围 |
 | [architecture.md](./architecture.md) | 核心设计原则与架构 |
 | [types.md](./types.md) | 枚举与核心类型定义 |
-| [core-mechanisms.md](./core-mechanisms.md) | Tag、Attribute、Modifier、Effect、Ability、Event、Task 机制 |
+| [core-mechanisms.md](./core-mechanisms.md) | Tag、Attribute、Modifier、Effect、Ability、Event、Task 机制概览 |
+| [event.md](./event.md) | GameplayEvent 事件系统 |
+| [task.md](./task.md) | GameplayTask 轻量任务 |
 | [spec-system.md](./spec-system.md) | Spec 系统与成长性 |
 | [config-bridge.md](./config-bridge.md) | 配置桥接设计 |
 | [api-reference.md](./api-reference.md) | 目录结构与 API 参考 |

@@ -187,7 +187,7 @@ Cost 是一组 `{attribute, value}`，激活时从 `Current` 值中扣除。`val
 
 - 技能激活/结束、效果应用/移除、标签变化、属性变化均会触发事件。
 - Reactive 技能通过监听事件自动尝试激活。
-- 业务系统可监听事件实现日志、任务、统计等功能。
+- 业务系统可监听事件实现日志、任务、统计等功能。详见 [event.md](./event.md)。
 
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
@@ -204,6 +204,10 @@ flowchart TD
     B --> E[GameplayTask]
     C -->|TryActivate| F[Ability 激活]
 ```
+
+### 6.8 GameplayTask
+
+`GameplayTask` 提供延时、周期、等待事件三类轻量异步任务，保存在 `EntityState.tasks` 中，由 `MiniASC.update` 统一推进。详见 [task.md](./task.md)。
 
 ---
 
