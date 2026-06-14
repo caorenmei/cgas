@@ -8,4 +8,20 @@ LUA_CPATH="lua_modules/lib/lua/5.4/?.so;${LUA_CPATH:-}"
 export LUA_PATH
 export LUA_CPATH
 
-exec lua5.4 -e 'package.path="lua_modules/share/lua/5.4/?.lua;lua_modules/share/lua/5.4/?/init.lua;./?.lua;./?/init.lua;"..package.path;package.cpath="lua_modules/lib/lua/5.4/?.so;"..package.cpath;local k,l,_=pcall(require,"luarocks.loader") _=k and l.add_context("busted","2.3.0-1")' lua_modules/lib/luarocks/rocks-5.4/busted/2.3.0-1/bin/busted "$@"
+# Detect installed busted version dynamically so the wrapper works across
+# different local trees (e.g. 2.2.0-1 vs 2.3.0-1).
+BUSTED_DIR=$(ls -d lua_modules/lib/luarocks/rocks-5.4/busted/* 2>/dev/null | head -n 1)
+if [ -z "$BUSTED_DIR" ]; then
+    echo "Error: busted not found in lua_modules/lib/luarocks/rocks-5.4/busted/" >&2
+    exit 1
+fi
+
+BUSTED_BIN="$BUSTED_DIR/bin/busted"
+if [ ! -f "$BUSTED_BIN" ]; then
+    echo "Error: busted binary not found at $BUSTED_BIN" >&2
+    exit 1
+fi
+
+BUSTED_VERSION=$(basename "$BUSTED_DIR")
+
+exec lua5.4 -e 'package.path="lua_modules/share/lua/5.4/?.lua;lua_modules/share/lua/5.4/?/init.lua;./?.lua;./?/init.lua;"..package.path;package.cpath="lua_modules/lib/lua/5.4/?.so;"..package.cpath;local k,l,_=pcall(require,"luarocks.loader") _=k and l.add_context("busted","'"$BUSTED_VERSION"'")' "$BUSTED_BIN" "$@"
