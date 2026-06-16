@@ -69,7 +69,7 @@ function mini_gas.match_tags(entity, module, allof_tags, anyof_tags, noneof_tags
 function mini_gas.evaluate(context, world, world_module, defs, evaluation, ...) end
 ```
 
-`IEvaluation.apply` 在每个能力实体（owner）处理完毕后调用一次，传递该 owner 产生的所有授予标签与属性变化。可选的 `begin_* / end_*` 回调用于日志或副作用。
+`IEvaluation.apply` 在每个能力实体（owner）处理完毕后调用一次，传递该 owner 产生的所有授予标签集合（`table<mini_gas.Tag, boolean>`）与属性变化数组。可选的 `begin_* / end_*` 回调用于日志或副作用。
 
 ---
 

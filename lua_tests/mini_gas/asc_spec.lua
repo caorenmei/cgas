@@ -254,14 +254,15 @@ describe("mini_gas v2 asc", function()
             },
         }
 
-        local granted = {}
+        local owner_tags = {}
         local deltas = {}
         local evaluation = {
-            apply = function(_, _, _, _, _, _, _, granted_tags, attr_changes)
-                for _, entry in ipairs(granted_tags) do
-                    granted[entry.entity] = granted[entry.entity] or {}
-                    table.insert(granted[entry.entity], entry.tag)
+            apply = function(_, _, _, _, owner_id, _, _, tags, attr_changes)
+                local copied = {}
+                for tag in pairs(tags) do
+                    copied[tag] = true
                 end
+                owner_tags[owner_id] = copied
                 for _, entry in ipairs(attr_changes) do
                     deltas[entry.entity] = deltas[entry.entity] or {}
                     deltas[entry.entity][entry.attr_id] = { value = entry.value }
@@ -270,8 +271,7 @@ describe("mini_gas v2 asc", function()
         }
 
         mini_gas.evaluate({}, world, world_module, defs, evaluation)
-        assert.is_not_nil(granted[commander])
-        assert.is_not_nil(granted[ally])
+        assert.is_true(owner_tags["commander"][TAG_AURA])
         assert.near(20, deltas[commander][ATTR_ATTACK].value, 0.0001)
         assert.near(20, deltas[ally][ATTR_ATTACK].value, 0.0001)
     end)
@@ -315,15 +315,17 @@ describe("mini_gas v2 asc", function()
             },
         }
 
-        local granted_count = 0
+        local total_tag_count = 0
         local evaluation = {
-            apply = function(_, _, _, _, _, _, _, granted_tags)
-                granted_count = granted_count + #granted_tags
+            apply = function(_, _, _, _, _, _, _, tags)
+                for _ in pairs(tags) do
+                    total_tag_count = total_tag_count + 1
+                end
             end,
         }
 
         mini_gas.evaluate({}, world, world_module, defs, evaluation)
-        assert.equal(2, granted_count) -- a has the ability and activates; grants tags to a and b
+        assert.equal(1, total_tag_count) -- a has the ability and activates; grants TAG_AURA once
     end)
 
     it("evaluate passes condition function extras to modifier functions", function()

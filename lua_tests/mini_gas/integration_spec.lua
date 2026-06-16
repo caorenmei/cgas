@@ -178,13 +178,14 @@ describe("mini_gas v2 integration", function()
         local world_module = make_world_module(world_state, modules)
 
         local results = {}
-        local granted_tags = {}
+        local owner_tags = {}
         local evaluation = {
-            apply = function(_, _, _, _, _, _, _, granted, attr_changes)
-                for _, entry in ipairs(granted) do
-                    granted_tags[entry.entity] = granted_tags[entry.entity] or {}
-                    table.insert(granted_tags[entry.entity], { tag = entry.tag })
+            apply = function(_, _, _, _, owner_id, _, _, tags, attr_changes)
+                local copied = {}
+                for tag in pairs(tags) do
+                    copied[tag] = true
                 end
+                owner_tags[owner_id] = copied
                 for _, entry in ipairs(attr_changes) do
                     results[entry.entity] = results[entry.entity] or {}
                     results[entry.entity][entry.attr_id] = (results[entry.entity][entry.attr_id] or 0) + entry.value
@@ -203,7 +204,6 @@ describe("mini_gas v2 integration", function()
         assert.near(120, final_attr("commander", ATTR_ATTACK), 0.0001)
         assert.near(120, final_attr("ally", ATTR_ATTACK), 0.0001)
 
-        assert.is_not_nil(granted_tags[commander_state])
-        assert.is_not_nil(granted_tags[ally_state])
+        assert.is_true(owner_tags["commander"][TAG_AURA])
     end)
 end)

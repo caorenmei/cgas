@@ -49,14 +49,11 @@ local EEffectTarget = {
 ---@field ability_defs table<mini_gas.ID, mini_gas.AbilityDef>
 ```
 
-### 5.4 回调数据条目
+### 5.4 回调数据
+
+`IEvaluation.apply` 接收的 `tags` 为当前 owner 授予的所有标签集合，`table<mini_gas.Tag, boolean>` 形式；`attr_changes` 为属性变化数组。
 
 ```lua
----@class mini_gas.GrantedTagEntry
----@field entity mini_gas.IEntityState
----@field module mini_gas.IEntityModule
----@field tag mini_gas.Tag
-
 ---@class mini_gas.AttrChangeEntry
 ---@field entity mini_gas.IEntityState
 ---@field module mini_gas.IEntityModule
@@ -74,7 +71,7 @@ local EEffectTarget = {
 ---@field end_effect? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
 ---@field begin_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
 ---@field end_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
----@field apply fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, granted_tags: mini_gas.GrantedTagEntry[], attr_changes: mini_gas.AttrChangeEntry[], ...: unknown)
+---@field apply fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, tags: table<mini_gas.Tag, boolean>, attr_changes: mini_gas.AttrChangeEntry[], ...: unknown)
 ```
 
 ### 5.6 ModifierDef

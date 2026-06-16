@@ -186,7 +186,7 @@ end
 
 --- 世界快照求值入口
 --- 遍历所有实体的被动能力，按标签约束筛选目标，聚合属性修改后通过 IEvaluation.apply 应用
---- 内部使用对象池复用临时表；apply 回调返回后，granted_tags 与 attr_changes 会被立即回收，
+--- 内部使用对象池复用临时表；apply 回调返回后，tags 与 attr_changes 会被立即回收，
 --- 业务方如需保留应在 apply 内部复制
 ---@param context mini_gas.IContext
 ---@param world mini_gas.IWorldState
@@ -199,7 +199,8 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
 
     for owner_id, owner_entity, owner_module in world_module.entities(context, world) do
         -- 当前 owner 产生的所有授予标签与属性修改
-        local owner_granted = acquire_table()
+        -- tags 为 table<mini_gas.Tag, boolean>，仅表示该 owner 授予了哪些标签
+        local owner_tags = acquire_table()
         ---@type table<any, { entity: mini_gas.IEntityState, module: mini_gas.IEntityModule, attrs: table<any, { add: number, multiply: number, override: number? }> }>
         local owner_mods = acquire_table()
 
@@ -275,14 +276,8 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
 
                 -- 累积要授予的标签
                 if effect_def.grant_tags and #effect_def.grant_tags > 0 then
-                    for _, target in ipairs(targets) do
-                        for _, tag in ipairs(effect_def.grant_tags) do
-                            local entry = acquire_table()
-                            entry.entity = target.entity
-                            entry.module = target.module
-                            entry.tag = tag
-                            owner_granted[#owner_granted + 1] = entry
-                        end
+                    for _, tag in ipairs(effect_def.grant_tags) do
+                        owner_tags[tag] = true
                     end
                 end
 
@@ -372,11 +367,10 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
         end
 
         -- 应用当前 owner 的所有结果
-        evaluation.apply(context, world, world_module, defs, owner_id, owner_entity, owner_module, owner_granted, attr_changes, ...)
+        evaluation.apply(context, world, world_module, defs, owner_id, owner_entity, owner_module, owner_tags, attr_changes, ...)
 
         -- 回收 apply 使用的表（apply 返回后业务方不应再持有）
-        release_array_entries(owner_granted)
-        release_table(owner_granted)
+        release_table(owner_tags)
         release_array_entries(attr_changes)
         release_table(attr_changes)
 

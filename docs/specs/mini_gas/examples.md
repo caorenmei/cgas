@@ -188,14 +188,11 @@ local world_module = {
 -- 4. 调用 evaluate 并收集结果
 local context = {}
 local results = {}
-local granted_tags = {}
+local owner_tags = {}
 
 local evaluation = {
-    apply = function(_, _, _, _, _, _, _, granted, attr_changes)
-        for _, entry in ipairs(granted) do
-            granted_tags[entry.entity] = granted_tags[entry.entity] or {}
-            table.insert(granted_tags[entry.entity], { tag = entry.tag })
-        end
+    apply = function(_, _, _, _, owner_id, _, _, tags, attr_changes)
+        owner_tags[owner_id] = tags
         for _, entry in ipairs(attr_changes) do
             results[entry.entity] = results[entry.entity] or {}
             results[entry.entity][entry.attr_id] = (results[entry.entity][entry.attr_id] or 0) + entry.value
@@ -219,6 +216,10 @@ print(final_attr(commander_state, ATTR_ATTACK)) -- 120
 
 -- ally: 被 commander 的光环跨实体作用; attack = 120
 print(final_attr(ally_state, ATTR_ATTACK))      -- 120
+
+-- 每个 owner 的标签集合
+print(owner_tags["commander"][TAG_AURA]) -- true
+print(owner_tags["ally"][TAG_AURA])      -- true
 ```
 
 ---
