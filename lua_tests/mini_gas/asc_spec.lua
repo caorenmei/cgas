@@ -58,6 +58,19 @@ local function make_world_module(world, modules)
     }
 end
 
+--- 从 evaluation.apply 调用中累加属性变化
+---@param deltas table<any, number>
+---@return mini_gas.IEvaluation
+local function make_evaluation(deltas)
+    return {
+        apply = function(_, _, _, _, _, _, _, _, attr_changes)
+            for _, entry in ipairs(attr_changes) do
+                deltas[entry.attr_id] = (deltas[entry.attr_id] or 0) + entry.value
+            end
+        end,
+    }
+end
+
 describe("mini_gas v2 asc", function()
     local ATTR_ATTACK = "attr.attack"
     local ATTR_GOLD = "attr.gold"
@@ -121,14 +134,7 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-                deltas[attr_id] = value
-            end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
         assert.equal(50, deltas[ATTR_ATTACK])
     end)
 
@@ -163,18 +169,11 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-                deltas[attr_id] = value
-            end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
         assert.equal(40, deltas[ATTR_ATTACK])
     end)
 
-    it("evaluate aggregates add and multiply modifiers from same owner", function()
+    it("evaluate aggregates add and multiply modifiers from same effect", function()
         local entity = {
             attrs = { [ATTR_GOLD] = 0 },
             static_tags = { [TAG_VIP] = true },
@@ -211,14 +210,7 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-                deltas[attr_id] = value
-            end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
         assert.near(120, deltas[ATTR_GOLD], 0.0001)
     end)
 
@@ -265,24 +257,23 @@ describe("mini_gas v2 asc", function()
         local granted = {}
         local deltas = {}
         local evaluation = {
-            grant_tags = function(_, _, _, entity, src_entity_id, _, effect_def_id, tags)
-                granted[entity] = { src = src_entity_id, effect = effect_def_id, tags = tags }
-            end,
-            apply_attribute = function(_, _, _, entity, src_entity_id, _, _, attr_id, value)
-                deltas[entity] = deltas[entity] or {}
-                deltas[entity][attr_id] = { value = value, src = src_entity_id }
+            apply = function(_, _, _, _, _, _, _, granted_tags, attr_changes)
+                for _, entry in ipairs(granted_tags) do
+                    granted[entry.entity] = granted[entry.entity] or {}
+                    table.insert(granted[entry.entity], entry.tag)
+                end
+                for _, entry in ipairs(attr_changes) do
+                    deltas[entry.entity] = deltas[entry.entity] or {}
+                    deltas[entry.entity][entry.attr_id] = { value = entry.value }
+                end
             end,
         }
 
         mini_gas.evaluate({}, world, world_module, defs, evaluation)
         assert.is_not_nil(granted[commander])
         assert.is_not_nil(granted[ally])
-        assert.equal("commander", granted[commander].src)
-        assert.equal("commander", granted[ally].src)
         assert.near(20, deltas[commander][ATTR_ATTACK].value, 0.0001)
         assert.near(20, deltas[ally][ATTR_ATTACK].value, 0.0001)
-        assert.equal("commander", deltas[commander][ATTR_ATTACK].src)
-        assert.equal("commander", deltas[ally][ATTR_ATTACK].src)
     end)
 
     it("evaluate handles ability condition object with requires_count and include_self", function()
@@ -326,8 +317,9 @@ describe("mini_gas v2 asc", function()
 
         local granted_count = 0
         local evaluation = {
-            grant_tags = function() granted_count = granted_count + 1 end,
-            apply_attribute = function() end,
+            apply = function(_, _, _, _, _, _, _, granted_tags)
+                granted_count = granted_count + #granted_tags
+            end,
         }
 
         mini_gas.evaluate({}, world, world_module, defs, evaluation)
@@ -351,7 +343,7 @@ describe("mini_gas v2 asc", function()
                     id = EFFECT_SWORD,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _, extra)
+                            attribute = function(_, _, _, _, _, _, _, _, extra)
                                 local level = extra and extra.level or 1
                                 return ATTR_GOLD, 100 * level
                             end,
@@ -365,7 +357,7 @@ describe("mini_gas v2 asc", function()
                     id = ABILITY_SWORD,
                     activation_policy = EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_SWORD },
-                    can_activate = function()
+                    can_activate = function(_, _, _, _, _, _, _, _, _)
                         return true, { level = 3 }
                     end,
                 },
@@ -373,14 +365,7 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-                deltas[attr_id] = value
-            end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
         assert.equal(300, deltas[ATTR_GOLD])
     end)
 
@@ -408,7 +393,7 @@ describe("mini_gas v2 asc", function()
                     target = EEffectTarget.All,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _, count)
+                            attribute = function(_, _, _, _, _, _, _, _, count)
                                 received_count = count
                                 return ATTR_ATTACK, 1.1
                             end,
@@ -431,12 +416,7 @@ describe("mini_gas v2 asc", function()
             },
         }
 
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function() end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation({}))
         assert.equal(2, received_count)
     end)
 
@@ -468,14 +448,7 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-                deltas[attr_id] = value
-            end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
         assert.equal(20, deltas[ATTR_ATTACK]) -- 100 + 50 clamped to 120, delta = 20
     end)
 
@@ -497,10 +470,10 @@ describe("mini_gas v2 asc", function()
                     id = EFFECT_SWORD,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _)
+                            attribute = function(_, _, _, _, _, _, _, _, _)
                                 step = step + 1
                                 if step == 1 then
-                                    return ATTR_ATTACK, 10, function(_, _, _, _, _, _)
+                                    return ATTR_ATTACK, 10, function(_, _, _, _, _, _, _, _, _)
                                         step = step + 1
                                         return ATTR_GOLD, 5, nil
                                     end
@@ -522,14 +495,7 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-                deltas[attr_id] = value
-            end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
         assert.equal(10, deltas[ATTR_ATTACK])
         assert.equal(5, deltas[ATTR_GOLD])
     end)
@@ -565,14 +531,7 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        local evaluation = {
-            grant_tags = function() end,
-            apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-                deltas[attr_id] = value
-            end,
-        }
-
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
+        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
         assert.equal(200, deltas[ATTR_ATTACK]) -- override 300 - base 100 = 200
     end)
 end)

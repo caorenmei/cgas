@@ -92,7 +92,7 @@ describe("mini_gas v2 integration", function()
                     id = EFFECT_BUILDING,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _, extra)
+                            attribute = function(_, _, _, _, _, _, _, _, extra)
                                 local world_level = extra and extra.world_level or 1
                                 return ATTR_GOLD, 100 * world_level
                             end,
@@ -131,7 +131,7 @@ describe("mini_gas v2 integration", function()
                     id = ABILITY_BUILDING,
                     activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_BUILDING },
-                    can_activate = function()
+                    can_activate = function(_, _, _, _, _, _, _)
                         return true, { world_level = 3 }
                     end,
                 },
@@ -180,15 +180,15 @@ describe("mini_gas v2 integration", function()
         local results = {}
         local granted_tags = {}
         local evaluation = {
-            grant_tags = function(_, _, _, entity, src_entity_id, _, effect_def_id, tags)
-                granted_tags[entity] = granted_tags[entity] or {}
-                for _, tag in ipairs(tags) do
-                    table.insert(granted_tags[entity], { tag = tag, src = src_entity_id, effect = effect_def_id })
+            apply = function(_, _, _, _, _, _, _, granted, attr_changes)
+                for _, entry in ipairs(granted) do
+                    granted_tags[entry.entity] = granted_tags[entry.entity] or {}
+                    table.insert(granted_tags[entry.entity], { tag = entry.tag })
                 end
-            end,
-            apply_attribute = function(_, _, _, entity, _, _, _, attr_id, value)
-                results[entity] = results[entity] or {}
-                results[entity][attr_id] = (results[entity][attr_id] or 0) + value
+                for _, entry in ipairs(attr_changes) do
+                    results[entry.entity] = results[entry.entity] or {}
+                    results[entry.entity][entry.attr_id] = (results[entry.entity][entry.attr_id] or 0) + entry.value
+                end
             end,
         }
 

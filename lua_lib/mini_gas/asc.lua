@@ -1,5 +1,5 @@
 --- MiniGas V2 核心求值模块
---- 快照式、被动-only、标签驱动、接口解耦
+--- 快照式、被动-only、标签驱动、接口解耦、内部对象池
 local enum = require("mini_gas.enum")
 
 local ASC = {}
@@ -87,6 +87,49 @@ local function clamp(value, min, max)
     return value
 end
 
+--- 模块级表对象池，用于复用 evaluate 内部的临时表
+local table_pool = {}
+
+--- 从对象池获取一张已清空的表
+---@return table
+local function acquire_table()
+    local t = table.remove(table_pool)
+    if t then
+        for k, _ in pairs(t) do
+            t[k] = nil
+        end
+    else
+        t = {}
+    end
+    return t
+end
+
+--- 将表清空并归还对象池
+---@param t table
+local function release_table(t)
+    for k, _ in pairs(t) do
+        t[k] = nil
+    end
+    table.insert(table_pool, t)
+end
+
+--- 释放数组中存放的表条目，并清空数组本身
+---@param arr table
+local function release_array_entries(arr)
+    for i = 1, #arr do
+        release_table(arr[i])
+        arr[i] = nil
+    end
+end
+
+--- 若函数存在则调用
+---@param fn function?
+local function call_if_present(fn, ...)
+    if fn then
+        fn(...)
+    end
+end
+
 --- 统计世界中满足激活条件的实体数量
 ---@param context mini_gas.IContext
 ---@param world mini_gas.IWorldState
@@ -107,26 +150,33 @@ local function count_matching_entities(context, world, world_module, condition, 
 end
 
 --- 解析 ModifierDef.attribute，递归收集所有 (id, value) 对
+--- 返回的数组与其中条目均来自对象池，调用方负责回收
 ---@param context mini_gas.IContext
 ---@param world mini_gas.IWorldState
+---@param world_module mini_gas.IWorldModule
 ---@param entity mini_gas.IEntityState
+---@param entity_module mini_gas.IEntityModule
 ---@param modifier_def mini_gas.ModifierDef
 ---@param extra unknown[]
----@return [mini_gas.ID, number][]
-local function resolve_modifier_attribute(context, world, entity, modifier_def, extra)
-    local result = {}
+---@return table
+local function resolve_modifier_attribute(context, world, world_module, entity, entity_module, modifier_def, extra)
+    local result = acquire_table()
     local attr = modifier_def.attribute
     if type(attr) == "table" then
         local id, value = attr[1], attr[2]
         if id ~= nil and value ~= nil then
-            result[#result + 1] = { id, value }
+            local entry = acquire_table()
+            entry[1], entry[2] = id, value
+            result[#result + 1] = entry
         end
     elseif type(attr) == "function" then
         local next_eval = attr
         while type(next_eval) == "function" do
-            local id, value, nxt = next_eval(context, world, entity, modifier_def, nil, nil, table.unpack(extra))
+            local id, value, nxt = next_eval(context, world, world_module, entity, entity_module, modifier_def, nil, nil, table.unpack(extra))
             if id ~= nil and value ~= nil then
-                result[#result + 1] = { id, value }
+                local entry = acquire_table()
+                entry[1], entry[2] = id, value
+                result[#result + 1] = entry
             end
             next_eval = nxt
         end
@@ -135,7 +185,9 @@ local function resolve_modifier_attribute(context, world, entity, modifier_def, 
 end
 
 --- 世界快照求值入口
---- 遍历所有实体的被动能力，按标签约束筛选目标，聚合属性修改后通过 IEvaluation 应用
+--- 遍历所有实体的被动能力，按标签约束筛选目标，聚合属性修改后通过 IEvaluation.apply 应用
+--- 内部使用对象池复用临时表；apply 回调返回后，granted_tags 与 attr_changes 会被立即回收，
+--- 业务方如需保留应在 apply 内部复制
 ---@param context mini_gas.IContext
 ---@param world mini_gas.IWorldState
 ---@param world_module mini_gas.IWorldModule
@@ -144,11 +196,12 @@ end
 ---@param ... unknown
 function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
     local evaluate_args = { ... }
-    for owner_id, owner_entity, owner_module in world_module.entities(context, world) do
 
-        -- 按 (target_id, attr_id) 聚合当前 owner 产生的所有修改
-        ---@type table<any, { entity: mini_gas.IEntityState, module: mini_gas.IEntityModule, attrs: table<any, { add: number, multiply: number, override: number?, ability_id: mini_gas.ID?, effect_id: mini_gas.ID? }> }>
-        local owner_mods = {}
+    for owner_id, owner_entity, owner_module in world_module.entities(context, world) do
+        -- 当前 owner 产生的所有授予标签与属性修改
+        local owner_granted = acquire_table()
+        ---@type table<any, { entity: mini_gas.IEntityState, module: mini_gas.IEntityModule, attrs: table<any, { add: number, multiply: number, override: number? }> }>
+        local owner_mods = acquire_table()
 
         for ability_def_id in owner_module.static_abilities(owner_entity) do
             local ability_def = defs.ability_defs[ability_def_id]
@@ -159,6 +212,7 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
             -- 评估激活条件，构造 ModifierAttributeEval 末尾可变参数
             local active
             local modifier_extra ---@type unknown[]
+            local need_release_modifier_extra = false
             local can_activate = ability_def.can_activate
             if can_activate == nil then
                 active = true
@@ -166,9 +220,14 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
             elseif type(can_activate) == "table" then
                 local count = count_matching_entities(context, world, world_module, can_activate, owner_id)
                 active = count >= (can_activate.requires_count or 1)
-                modifier_extra = { count, table.unpack(evaluate_args) }
+                modifier_extra = acquire_table()
+                modifier_extra[1] = count
+                for i = 1, #evaluate_args do
+                    modifier_extra[i + 1] = evaluate_args[i]
+                end
+                need_release_modifier_extra = true
             elseif type(can_activate) == "function" then
-                local results = { can_activate(context, defs, world, owner_entity, ability_def, ...) }
+                local results = { can_activate(context, defs, world, world_module, owner_entity, owner_module, ability_def, ...) }
                 active = results[1] == true
                 table.remove(results, 1)
                 modifier_extra = results
@@ -177,8 +236,13 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
             end
 
             if not active then
+                if need_release_modifier_extra then
+                    release_table(modifier_extra)
+                end
                 goto continue_ability
             end
+
+            call_if_present(evaluation.begin_ability, context, world, world_module, defs, owner_id, owner_entity, owner_module, ability_def_id, ...)
 
             for _, effect_def_id in ipairs(ability_def.effects or {}) do
                 local effect_def = defs.effect_defs[effect_def_id]
@@ -186,8 +250,10 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
                     goto continue_effect
                 end
 
-                -- 根据 target 确定候选目标集合
-                local candidates = {}
+                call_if_present(evaluation.begin_effect, context, world, world_module, defs, owner_id, owner_entity, owner_module, ability_def_id, effect_def_id, ...)
+
+                -- 根据 target 确定目标实体集合，并同时用效果自身标签约束筛选
+                local targets = acquire_table()
                 local target_type = effect_def.target or enum.EEffectTarget.Self
                 for entity_id, entity, entity_module in world_module.entities(context, world) do
                     local include = false
@@ -198,68 +264,91 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
                     else
                         include = entity_id == owner_id
                     end
-                    if include then
-                        candidates[#candidates + 1] = { id = entity_id, entity = entity, module = entity_module }
+                    if include and ASC.match_tags(entity, entity_module, effect_def.allof_tags, effect_def.anyof_tags, effect_def.noneof_tags) then
+                        local entry = acquire_table()
+                        entry.id = entity_id
+                        entry.entity = entity
+                        entry.module = entity_module
+                        targets[#targets + 1] = entry
                     end
                 end
 
-                -- 按效果自身标签约束筛选目标
-                local targets = {}
-                for _, candidate in ipairs(candidates) do
-                    if ASC.match_tags(candidate.entity, candidate.module, effect_def.allof_tags, effect_def.anyof_tags, effect_def.noneof_tags) then
-                        targets[#targets + 1] = candidate
-                    end
-                end
-
-                -- 对目标授予标签
+                -- 累积要授予的标签
                 if effect_def.grant_tags and #effect_def.grant_tags > 0 then
                     for _, target in ipairs(targets) do
-                        evaluation.grant_tags(context, world, defs, target.entity, owner_id, ability_def_id, effect_def_id, effect_def.grant_tags, table.unpack(evaluate_args))
-                    end
-                end
-
-                -- 收集生效的 modifier 并聚合到 owner_mods
-                for _, modifier_def in ipairs(effect_def.modifiers or {}) do
-                    for _, target in ipairs(targets) do
-                        if ASC.match_tags(target.entity, target.module, modifier_def.allof_tags, modifier_def.anyof_tags, modifier_def.noneof_tags) then
-                            local pairs = resolve_modifier_attribute(context, world, target.entity, modifier_def, modifier_extra)
-                            for _, pair in ipairs(pairs) do
-                                local attr_id, value = pair[1], pair[2]
-                                local target_entry = owner_mods[target.id]
-                                if not target_entry then
-                                    target_entry = { entity = target.entity, module = target.module, attrs = {} }
-                                    owner_mods[target.id] = target_entry
-                                end
-                                local attr_entry = target_entry.attrs[attr_id]
-                                if not attr_entry then
-                                    attr_entry = { add = 0, multiply = 1, override = nil, ability_id = ability_def_id, effect_id = effect_def_id }
-                                    target_entry.attrs[attr_id] = attr_entry
-                                end
-                                if modifier_def.op == enum.EModifierOp.Add then
-                                    attr_entry.add = attr_entry.add + value
-                                    attr_entry.ability_id = ability_def_id
-                                    attr_entry.effect_id = effect_def_id
-                                elseif modifier_def.op == enum.EModifierOp.Multiply then
-                                    attr_entry.multiply = attr_entry.multiply * value
-                                    attr_entry.ability_id = ability_def_id
-                                    attr_entry.effect_id = effect_def_id
-                                elseif modifier_def.op == enum.EModifierOp.Override then
-                                    attr_entry.override = value
-                                    attr_entry.ability_id = ability_def_id
-                                    attr_entry.effect_id = effect_def_id
-                                end
-                            end
+                        for _, tag in ipairs(effect_def.grant_tags) do
+                            local entry = acquire_table()
+                            entry.entity = target.entity
+                            entry.module = target.module
+                            entry.tag = tag
+                            owner_granted[#owner_granted + 1] = entry
                         end
                     end
                 end
 
+                -- 累积 modifier 结果到 owner 级别
+                for _, modifier_def in ipairs(effect_def.modifiers or {}) do
+                    for _, target in ipairs(targets) do
+                        if ASC.match_tags(target.entity, target.module, modifier_def.allof_tags, modifier_def.anyof_tags, modifier_def.noneof_tags) then
+                            call_if_present(evaluation.begin_modifier, context, world, world_module, defs, owner_id, owner_entity, owner_module, ability_def_id, effect_def_id, modifier_def, target.entity, target.module, ...)
+
+                            local pairs = resolve_modifier_attribute(context, world, world_module, target.entity, target.module, modifier_def, modifier_extra)
+                            for _, pair in ipairs(pairs) do
+                                local attr_id, value = pair[1], pair[2]
+                                local target_entry = owner_mods[target.id]
+                                if not target_entry then
+                                    target_entry = acquire_table()
+                                    target_entry.entity = target.entity
+                                    target_entry.module = target.module
+                                    target_entry.attrs = acquire_table()
+                                    owner_mods[target.id] = target_entry
+                                end
+                                local attr_entry = target_entry.attrs[attr_id]
+                                if not attr_entry then
+                                    attr_entry = acquire_table()
+                                    attr_entry.add = 0
+                                    attr_entry.multiply = 1
+                                    attr_entry.override = nil
+                                    target_entry.attrs[attr_id] = attr_entry
+                                end
+                                if modifier_def.op == enum.EModifierOp.Add then
+                                    attr_entry.add = attr_entry.add + value
+                                elseif modifier_def.op == enum.EModifierOp.Multiply then
+                                    attr_entry.multiply = attr_entry.multiply * value
+                                elseif modifier_def.op == enum.EModifierOp.Override then
+                                    attr_entry.override = value
+                                end
+                            end
+                            release_array_entries(pairs)
+                            release_table(pairs)
+
+                            call_if_present(evaluation.end_modifier, context, world, world_module, defs, owner_id, owner_entity, owner_module, ability_def_id, effect_def_id, modifier_def, target.entity, target.module, ...)
+                        end
+                    end
+                end
+
+                -- 回收 targets
+                for i = 1, #targets do
+                    release_table(targets[i])
+                end
+                release_table(targets)
+
+                call_if_present(evaluation.end_effect, context, world, world_module, defs, owner_id, owner_entity, owner_module, ability_def_id, effect_def_id, ...)
+
                 ::continue_effect::
+            end
+
+            call_if_present(evaluation.end_ability, context, world, world_module, defs, owner_id, owner_entity, owner_module, ability_def_id, ...)
+
+            if need_release_modifier_extra then
+                release_table(modifier_extra)
             end
 
             ::continue_ability::
         end
 
-        -- 应用当前 owner 聚合后的属性变化
+        -- 生成属性变化列表（已按 target 聚合并截断）
+        local attr_changes = acquire_table()
         for _, target_entry in pairs(owner_mods) do
             for attr_id, attr_entry in pairs(target_entry.attrs) do
                 local base = target_entry.module.get_attribute(target_entry.entity, attr_id)
@@ -271,9 +360,35 @@ function ASC.evaluate(context, world, world_module, defs, evaluation, ...)
                     final = clamp(final, attr_def.min, attr_def.max)
                 end
                 local delta = final - base
-                evaluation.apply_attribute(context, world, defs, target_entry.entity, owner_id, attr_entry.ability_id, attr_entry.effect_id, attr_id, delta, table.unpack(evaluate_args))
+                if delta ~= 0 or attr_entry.override ~= nil then
+                    local entry = acquire_table()
+                    entry.entity = target_entry.entity
+                    entry.module = target_entry.module
+                    entry.attr_id = attr_id
+                    entry.value = delta
+                    attr_changes[#attr_changes + 1] = entry
+                end
             end
         end
+
+        -- 应用当前 owner 的所有结果
+        evaluation.apply(context, world, world_module, defs, owner_id, owner_entity, owner_module, owner_granted, attr_changes, ...)
+
+        -- 回收 apply 使用的表（apply 返回后业务方不应再持有）
+        release_array_entries(owner_granted)
+        release_table(owner_granted)
+        release_array_entries(attr_changes)
+        release_table(attr_changes)
+
+        -- 释放 owner_mods 占用的内部表
+        for _, target_entry in pairs(owner_mods) do
+            for _, attr_entry in pairs(target_entry.attrs) do
+                release_table(attr_entry)
+            end
+            release_table(target_entry.attrs)
+            release_table(target_entry)
+        end
+        release_table(owner_mods)
     end
 end
 

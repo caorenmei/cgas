@@ -66,12 +66,19 @@ flowchart TD
 
 ### 3.3 IEvaluation
 
-求值回调接口，由业务方实现。
+求值回调接口，由业务方实现。核心接口为 `apply`，在能力实体（owner）的所有 Ability 处理完毕后调用一次，传递该 owner 产生的所有授予标签与属性变化。
+
+可选的 `begin_* / end_*` 回调用于调用方记录日志或执行其他副作用；若不需要，可省略。
 
 ```lua
 ---@class mini_gas.IEvaluation
----@field grant_tags fun(context: mini_gas.IContext, world: mini_gas.IWorldState, defs: mini_gas.Defs, entity: mini_gas.IEntityState, src_entity_id: mini_gas.ID, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, tags: mini_gas.Tag[], ...: unknown)
----@field apply_attribute fun(context: mini_gas.IContext, world: mini_gas.IWorldState, defs: mini_gas.Defs, entity: mini_gas.IEntityState, src_entity_id: mini_gas.ID, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, id: mini_gas.ID, value: number, ...: unknown)
+---@field begin_ability? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
+---@field end_ability? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
+---@field begin_effect? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
+---@field end_effect? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
+---@field begin_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field end_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field apply fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, granted_tags: mini_gas.GrantedTagEntry[], attr_changes: mini_gas.AttrChangeEntry[], ...: unknown)
 ```
 
 ---

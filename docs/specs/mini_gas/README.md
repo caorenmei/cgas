@@ -111,9 +111,10 @@ local world_module = {
 -- 3. 实现 IEvaluation
 local deltas = {}
 local evaluation = {
-    grant_tags = function() end,
-    apply_attribute = function(_, _, _, _, _, _, _, attr_id, value)
-        deltas[attr_id] = (deltas[attr_id] or 0) + value
+    apply = function(_, _, _, _, _, _, _, granted_tags, attr_changes)
+        for _, entry in ipairs(attr_changes) do
+            deltas[entry.attr_id] = (deltas[entry.attr_id] or 0) + entry.value
+        end
     end,
 }
 

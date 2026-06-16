@@ -12,7 +12,7 @@
 - 在 `Defs.attribute_defs` 中定义的属性，若 `AttributeDef.default` 存在，则初始值为 `default`；若省略，则初始值为 0。
 - 不在 `Defs.attribute_defs` 中定义的属性，默认初始值为 0，且不检查最大值和最小值约束。
 - 库在聚合所有生效的 Modifier 后，会按 `Defs.attribute_defs[id]` 中的 `min` 与 `max` 对最终值做截断；未定义 `min` 或 `max` 时，对应方向不限制。
-- 最终传给 `IEvaluation.apply_attribute` 的 `value` 已经是截断后的 `new_value - old_value`（add 语义）。
+- 最终传给 `IEvaluation.apply` 的 `attr_changes` 中每个条目的 `value` 已经是截断后的 `new_value - old_value`（add 语义），按 owner 级别聚合。
 
 ### 6.3 Modifier 聚合
 
@@ -50,12 +50,15 @@ value = final - base
 `ASC.evaluate(context, world, world_module, defs, evaluation, ...)` 的执行流程：
 
 1. 遍历世界中的每个实体，作为当前能力实体（owner）。
-2. 对每个能力实体，遍历其静态 Ability。
-3. 评估 Ability 的激活条件，构造 `ModifierAttributeEval` 末尾可变参数。
+2. 在 owner 级别累积所有 Ability / Effect / Modifier 产生的授予标签与属性修改。
+3. 对每个能力实体，遍历其静态 Ability；评估激活条件时会同时传入 `world_module` 与 `entity_module`。
 4. 如果 Ability 激活，则遍历其引用的 EffectDef。
 5. 根据 `EffectDef.target` 确定候选目标实体集合，并用 EffectDef 的标签约束筛选。
-6. 对目标实体调用 `IEvaluation.grant_tags` 授予标签。
-7. 对目标实体聚合并应用属性变化，通过 `IEvaluation.apply_attribute` 通知业务方。
+6. 对目标实体累积要授予的标签。
+7. 对目标实体按 Modifier 标签约束解析属性修改，并在 owner 级别按 `EModifierOp` 聚合。
+8. owner 的所有 Ability 处理完毕后，调用 `IEvaluation.apply`，传递聚合后的 `granted_tags` 与 `attr_changes`。
+
+可选的 `begin_ability / end_ability / begin_effect / end_effect / begin_modifier / end_modifier` 回调会在对应阶段触发，用于日志或副作用。
 
 ---
 

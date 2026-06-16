@@ -55,14 +55,33 @@
 ---@field has_entity fun(context: mini_gas.IContext, world: mini_gas.IWorldState, id: mini_gas.ID): boolean
 ---@field get_entity fun(context: mini_gas.IContext, world: mini_gas.IWorldState, id: mini_gas.ID): mini_gas.IEntityState, mini_gas.IEntityModule
 
+--- 授予标签条目
+---@class mini_gas.GrantedTagEntry
+---@field entity mini_gas.IEntityState
+---@field module mini_gas.IEntityModule
+---@field tag mini_gas.Tag
+
+--- 属性变化条目
+---@class mini_gas.AttrChangeEntry
+---@field entity mini_gas.IEntityState
+---@field module mini_gas.IEntityModule
+---@field attr_id mini_gas.ID
+---@field value number
+
 --- 求值回调接口，由业务方实现
 ---@class mini_gas.IEvaluation
----@field grant_tags fun(context: mini_gas.IContext, world: mini_gas.IWorldState, defs: mini_gas.Defs, entity: mini_gas.IEntityState, src_entity_id: mini_gas.ID, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, tags: mini_gas.Tag[], ...: unknown)
----@field apply_attribute fun(context: mini_gas.IContext, world: mini_gas.IWorldState, defs: mini_gas.Defs, entity: mini_gas.IEntityState, src_entity_id: mini_gas.ID, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, id: mini_gas.ID, value: number, ...: unknown)
+---@field begin_ability? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
+---@field end_ability? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
+---@field begin_effect? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
+---@field end_effect? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
+---@field begin_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field end_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field apply fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, granted_tags: mini_gas.GrantedTagEntry[], attr_changes: mini_gas.AttrChangeEntry[], ...: unknown)
 
 --- ModifierDef.attribute 函数形式
 --- 返回属性 ID、数值，以及可选的下一个求值函数
----@alias mini_gas.ModifierAttributeEval fun(context: mini_gas.IContext, world_state: mini_gas.IWorldState, entity: mini_gas.IEntityState, def: mini_gas.ModifierDef, id?: mini_gas.ID, value?: number, ...: unknown): mini_gas.ID, number, mini_gas.ModifierAttributeEval?
+--- 参数中 world_module / entity_module 用于业务方读取额外的世界或实体状态
+---@alias mini_gas.ModifierAttributeEval fun(context: mini_gas.IContext, world_state: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, entity: mini_gas.IEntityState, entity_module: mini_gas.IEntityModule, def: mini_gas.ModifierDef, id?: mini_gas.ID, value?: number, ...: unknown): mini_gas.ID, number, mini_gas.ModifierAttributeEval?
 
 --- 修饰器定义
 ---@class mini_gas.ModifierDef
@@ -91,7 +110,8 @@
 ---@field include_self? boolean 统计匹配实体数量时是否包含当前实体自身；默认为 true
 
 --- 激活条件函数
----@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, defs: mini_gas.Defs, world_state: mini_gas.IWorldState, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, ...
+--- 参数中 world_module / entity_module 用于业务方读取额外的世界或实体状态
+---@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, defs: mini_gas.Defs, world_state: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, entity: mini_gas.IEntityState, entity_module: mini_gas.IEntityModule, def: mini_gas.AbilityDef, ...: unknown): boolean, ...
 
 --- 能力定义
 ---@class mini_gas.AbilityDef
