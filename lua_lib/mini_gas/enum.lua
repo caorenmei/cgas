@@ -1,67 +1,28 @@
---- 所有枚举常量定义（运行时值）
---- 类型定义同步标注于本文件
+--- MiniGas V2 枚举定义
+--- 仅保留快照求值所需的最小枚举集合
 
 local M = {}
 
+--- 修饰器操作类型
 ---@enum mini_gas.EModifierOp
 M.EModifierOp = {
-    Add = 1,      -- 加法，聚合为 sum
-    Multiply = 2, -- 乘法，聚合为 product
-    Override = 3, -- 覆盖，按优先级取最终值
-    Compound = 4, -- 复合公式，由自定义函数计算
+    Add = 1,      -- 加法：将多个 Add 修改量累加
+    Multiply = 2, -- 乘法：将多个 Multiply 修改量连乘
+    Override = 3, -- 覆盖：同一属性的多个 Override 按生效顺序取最后一个值
 }
 
----@enum mini_gas.EDurationPolicy
-M.EDurationPolicy = {
-    Instant = 1,     -- 瞬时生效，立即修改 Current 后消失
-    Infinite = 2,    -- 永久生效，直到被显式移除
-    HasDuration = 3, -- 持续一段时间后自动消失
-}
-
----@enum mini_gas.EStackingPolicy
-M.EStackingPolicy = {
-    None = 1,    -- 重复应用时替换旧效果
-    Add = 2,     -- Stack 数相加
-    Replace = 3, -- 新效果替换旧效果
-    Refresh = 4, -- 刷新持续时间与 Stack
-}
-
+--- 能力激活策略，V2 仅支持被动
 ---@enum mini_gas.EAbilityActivationPolicy
 M.EAbilityActivationPolicy = {
-    Passive = 1,  -- 授予后自动持续生效
-    Active = 2,   -- 需要业务方显式调用 TryActivate
-    Reactive = 3, -- 响应特定 GameplayEvent 自动尝试激活
+    Passive = 1, -- 被动：满足条件时自动激活
 }
 
----@enum mini_gas.EAttribute
-M.EAttribute = {
-    None = "attr.none", -- 占位；业务 Attribute ID 由策划配置
-}
-
----@enum mini_gas.ETag
-M.ETag = {
-    None = "tag.none", -- 占位；业务 Tag 由策划配置
-}
-
----@enum mini_gas.EAbilityId
-M.EAbilityId = {
-    None = "ability.none", -- 占位；业务 Ability ID 由策划配置
-}
-
----@enum mini_gas.EEffectId
-M.EEffectId = {
-    None = "effect.none", -- 占位；业务 Effect ID 由策划配置
-}
-
----@enum mini_gas.EGameplayEvent
-M.EGameplayEvent = {
-    AbilityActivated = "event.ability.activated",
-    AbilityEnded = "event.ability.ended",
-    EffectApplied = "event.effect.applied",
-    EffectRemoved = "event.effect.removed",
-    AttributeChanged = "event.attribute.changed",
-    TagAdded = "event.tag.added",
-    TagRemoved = "event.tag.removed",
+--- 效果目标范围
+---@enum mini_gas.EEffectTarget
+M.EEffectTarget = {
+    Self = 1,  -- 仅对能力所属实体自身生效
+    Other = 2, -- 对世界中的其他实体生效
+    All = 3,   -- 对世界中的所有实体生效，包含能力所属实体自身
 }
 
 return M

@@ -1,334 +1,97 @@
 
 ## 5. 类型与枚举定义
 
-所有 LuaCATS 类型声明集中维护于 `lua_lib/mini_gas/types.lua`，枚举运行时值与 `@enum` 注解维护于 `lua_lib/mini_gas/enum.lua`。禁止在业务代码中使用魔术字符串。
+所有 LuaCATS 类型声明集中维护于 `lua_lib/mini_gas/types.lua`，枚举运行时值与 `@enum` 注解维护于 `lua_lib/mini_gas/enum.lua`。
 
-> **ID 与策划 Alias**：属性、标签、技能、效果、事件等 ID 均对应策划配置的 `alias`，其值类型为 `string | integer`。`mini-gas` 框架仅预定义其运行所必须的最小核心常量；业务逻辑所需的 ID 应由策划配置并通过 `ConfigAdapter` 映射到项目级 `@enum`，不得在框架层硬编码。
-
-### 5.1 枚举
-
-枚举定义位于 `lua_lib/mini_gas/enum.lua`，并通过 `---@enum` 标注类型。业务代码通过 `mini_gas.EModifierOp`、`mini_gas.EDurationPolicy` 等访问运行时值。
+### 5.1 基础别名
 
 ```lua
-local EModifierOp = mini_gas.EModifierOp
-local EDurationPolicy = mini_gas.EDurationPolicy
-local EStackingPolicy = mini_gas.EStackingPolicy
-local EAbilityActivationPolicy = mini_gas.EAbilityActivationPolicy
+---@alias mini_gas.ID integer | string
+---@alias mini_gas.Tag string
+---@alias mini_gas.Iterator fun(state: any, key?: any): any, any
 ```
 
-### 5.2 ID 别名
+### 5.2 枚举
 
 ```lua
----@alias mini_gas.TagId mini_gas.ETag | string | integer
----@alias mini_gas.AttributeId mini_gas.EAttribute | string | integer
----@alias mini_gas.AbilityId mini_gas.EAbilityId | string | integer
----@alias mini_gas.EffectId mini_gas.EEffectId | string | integer
----@alias mini_gas.GameplayEventId mini_gas.EGameplayEvent | string | integer
+---@enum mini_gas.EModifierOp
+local EModifierOp = {
+    Add = 1,      -- 加法：将多个 Add 修改量累加
+    Multiply = 2, -- 乘法：将多个 Multiply 修改量连乘
+    Override = 3, -- 覆盖：同一属性的多个 Override 按生效顺序取最后一个值
+}
+
+---@enum mini_gas.EAbilityActivationPolicy
+local EAbilityActivationPolicy = {
+    Passive = 1, -- 被动：满足条件时自动激活
+}
+
+---@enum mini_gas.EEffectTarget
+local EEffectTarget = {
+    Self = 1,  -- 仅对能力所属实体自身生效
+    Other = 2, -- 对世界中的其他实体生效
+    All = 3,   -- 对世界中的所有实体生效，包含能力所属实体自身
+}
 ```
 
-### 5.3 核心类型
-
-> **状态自包含约定**：`EntityState` / `WorldState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask` 的实例均为**无元表的普通 Lua 表**，且**不得引用任何外部对象**（包括配置 Def、其他运行时实例、下划线隐藏的查找表等）。所有运行时数据在创建时即自包含完整副本，可直接序列化、持久化与网络同步。对象操作统一通过对应模块的函数完成。
-
-#### 5.3.1 配置定义表 `Defs`
-
-`Defs` 由调用方持有，包含所有静态配置定义。需要读取配置或注册新 Def 的 API 会接收 `defs` 参数。
-
-```lua
----@class mini_gas.Defs
----@field attribute_defs table<mini_gas.AttributeId, mini_gas.AttributeDef>
----@field ability_defs table<mini_gas.AbilityId, mini_gas.GameplayAbilityDef>
----@field effect_defs table<mini_gas.EffectId, mini_gas.EffectDef>
-```
-
-创建：
-
-```lua
-local defs = mini_gas.Defs.new()
-```
-
-#### 5.3.2 标签容器
-
-标签直接使用 `mini_gas.TagId` 字符串/整数值，不封装 `GameplayTag` 对象。
-
-```lua
----@class mini_gas.GameplayTagContainer
----@field tags table<string, table<string, number>> 标签名 -> 来源 -> 引用计数
-```
-
-容器操作：
-
-```lua
----@param container mini_gas.GameplayTagContainer
----@param tag mini_gas.TagId
----@param source? string
-function tag_mod.add(container, tag, source) end
-
----@param container mini_gas.GameplayTagContainer
----@param tag mini_gas.TagId
----@param source? string
-function tag_mod.remove(container, tag, source) end
-
----@param container mini_gas.GameplayTagContainer
----@param tag mini_gas.TagId
----@return boolean
-function tag_mod.has(container, tag) end
-
----@param container mini_gas.GameplayTagContainer
----@param tags mini_gas.TagId[]
----@return boolean
-function tag_mod.has_any(container, tags) end
-
----@param container mini_gas.GameplayTagContainer
----@param tags mini_gas.TagId[]
----@return boolean
-function tag_mod.has_all(container, tags) end
-```
-
-标签匹配使用 `string.find` + `string.byte`，避免额外字符串分配：
-
-```lua
----@param a string
----@param b string
----@return boolean
-function tag_mod.matches(a, b) end
-```
-
-#### 5.3.3 属性
-
-`EntityState.attributes` 是普通 `table<AttributeId, number>`，不封装 `Attribute` 对象。
-
-`AttributeDef` 不再定义成长公式，属性成长由外部系统负责（例如通过 `set_current` 或直接修改 `state.attributes`）。
+### 5.3 配置定义
 
 ```lua
 ---@class mini_gas.AttributeDef
----@field name mini_gas.AttributeId
----@field alias? string|integer
----@field base? number
+---@field id mini_gas.ID
 ---@field min? number
 ---@field max? number
+---@field default? number
+
+---@class mini_gas.Defs
+---@field attribute_defs table<mini_gas.ID, mini_gas.AttributeDef>
+---@field effect_defs table<mini_gas.ID, mini_gas.EffectDef>
+---@field ability_defs table<mini_gas.ID, mini_gas.AbilityDef>
 ```
 
-#### 5.3.4 修饰器
-
-`ModifierDef.value` 仅支持 `number` 或 `fun(self: Modifier, v: number): number`（用于 `Compound`）。
-
-`Modifier` 运行时实例仅保留 `def_id`（所属 Effect 的 Def ID）、`index` 与 `stack`，配置通过 `defs` 查找。Modifier 实例在 `GameplayEffect` 创建时生成，并包含于 `effect.modifiers` 中。
+### 5.4 ModifierDef
 
 ```lua
+---@alias mini_gas.ModifierAttributeEval fun(context:mini_gas.IContext, world_state: mini_gas.IWorldState, entity: mini_gas.IEntityState, def: mini_gas.ModifierDef, id?: mini_gas.ID, value?: number, ...: unknown): mini_gas.ID, number, mini_gas.ModifierAttributeEval?
+
 ---@class mini_gas.ModifierDef
----@field attribute mini_gas.AttributeId
+---@field attribute [mini_gas.ID, number] | mini_gas.ModifierAttributeEval
 ---@field op mini_gas.EModifierOp
----@field value number | fun(self: mini_gas.Modifier, v: number): number
----@field priority? number
----@field require_tags? mini_gas.TagId[]
----@field blocked_tags? mini_gas.TagId[]
-
----@class mini_gas.Modifier
----运行时实例仅保留 def_id、index 与 stack，配置通过 defs 查找
----@field def_id mini_gas.EffectId
----@field index integer
----@field stack number
+---@field allof_tags? mini_gas.Tag[]
+---@field anyof_tags? mini_gas.Tag[]
+---@field noneof_tags? mini_gas.Tag[]
 ```
 
-修饰器操作：
-
-```lua
----@param def_id mini_gas.EffectId
----@param index integer
----@param stack? number
----@return mini_gas.Modifier
-function Modifier.new(def_id, index, stack) end
-
----@param defs mini_gas.Defs
----@param mod mini_gas.Modifier
----@return mini_gas.ModifierDef|nil
-function modifier_mod.def(defs, mod) end
-
----@param defs mini_gas.Defs
----@param mod mini_gas.Modifier
----@return (number|fun(self: mini_gas.Modifier, v: number): number)|nil
-function modifier_mod.value(defs, mod) end
-
----@param state mini_gas.EntityState
----@param defs mini_gas.Defs
----@param mod mini_gas.Modifier
----@return boolean
-function modifier_mod.is_active(state, defs, mod) end
-
----@param base number
----@param state mini_gas.EntityState
----@param defs mini_gas.Defs
----@param modifiers mini_gas.Modifier[]
----@return number
-function modifier_mod.calc_attribute(base, state, defs, modifiers) end
-```
-
-#### 5.3.5 效果
-
-`EffectDef` 是静态配置；`GameplayEffect` 运行时实例包含运行时生成的唯一 `id`（实例 ID）与 `def_id`（配置 ID），并通过 `def_id` 从 `defs` 查找配置。实例创建时会把 `ModifierDef[]` 转换为轻量的 `Modifier[]` 并包含于自身。
-
-`duration` / `period` 支持常量或公式函数 `fun(self: GameplayEffect, ...): number`。
+### 5.5 EffectDef
 
 ```lua
 ---@class mini_gas.EffectDef
----@field id mini_gas.EffectId
----@field alias? string|integer
----@field duration_policy mini_gas.EDurationPolicy
----@field duration? number | fun(self: mini_gas.GameplayEffect, ...): number
----@field period? number | fun(self: mini_gas.GameplayEffect, ...): number
+---@field id mini_gas.ID
 ---@field modifiers mini_gas.ModifierDef[]
----@field stacking? mini_gas.EStackingPolicy
----@field max_stack? number
----@field granted_tags? mini_gas.TagId[]
----@field require_tags? mini_gas.TagId[]
----@field blocked_tags? mini_gas.TagId[]
----@field source any
-
----@class mini_gas.GameplayEffect
----运行时实例保留实例 id、def_id 与运行时字段；包含 Modifier 数组
----@field id integer 运行时实例唯一 ID
----@field def_id mini_gas.EffectId 配置 ID
----@field stack number
----@field elapsed number
----@field remaining number
----@field last_trigger_count number
----@field modifiers mini_gas.Modifier[]
+---@field grant_tags? mini_gas.Tag[]
+---@field allof_tags? mini_gas.Tag[]
+---@field anyof_tags? mini_gas.Tag[]
+---@field noneof_tags? mini_gas.Tag[]
+---@field target? mini_gas.EEffectTarget
 ```
 
-效果操作：
+### 5.6 AbilityDef
 
 ```lua
----@param def mini_gas.EffectDef
----@param stack? number
----@return mini_gas.GameplayEffect
-function GameplayEffect.new(def, stack) end
+---@class mini_gas.AbilityActivateCondition
+---@field allof_tags? mini_gas.Tag[]
+---@field anyof_tags? mini_gas.Tag[]
+---@field noneof_tags? mini_gas.Tag[]
+---@field requires_count integer
+---@field include_self? boolean
 
----@param state mini_gas.EntityState
----@param defs mini_gas.Defs
----@param effect mini_gas.GameplayEffect
----@return boolean
-function effect_mod.meets_tag_requirements(state, defs, effect) end
+---@alias mini_gas.AbilityActivateConditionFunc fun(context:mini_gas.IContext, defs: mini_gas.Defs, world_state: mini_gas.IWorldState, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, unknown...
 
----@param effect mini_gas.GameplayEffect
----@param defs mini_gas.Defs
----@return number
-function effect_mod.period_value(effect, defs) end
-```
-
-#### 5.3.6 技能
-
-`GameplayAbilityDef` 是静态配置；`GameplayAbility` 运行时实例包含运行时生成的唯一 `id`（实例 ID）与 `def_id`（配置 ID），并通过 `def_id` 从 `defs` 查找配置。
-
-`cooldown` / `cost[attr]` 支持常量或公式函数 `fun(self: GameplayAbility, ...): number`。
-
-```lua
----@class mini_gas.GameplayAbilityDef
----@field id mini_gas.AbilityId
----@field alias? string|integer
+---@class mini_gas.AbilityDef
+---@field id mini_gas.ID
 ---@field activation_policy mini_gas.EAbilityActivationPolicy
----@field cooldown? number | fun(self: mini_gas.GameplayAbility, ...): number
----@field cost? table<mini_gas.AttributeId, number | fun(self: mini_gas.GameplayAbility, ...): number>
----@field require_tags? mini_gas.TagId[]
----@field blocked_tags? mini_gas.TagId[]
----@field grant_tags? mini_gas.TagId[]
----@field activation_event? mini_gas.GameplayEventId
----@field effects? mini_gas.EffectDef[]
----@field can_activate? fun(state: mini_gas.EntityState, payload: table?): boolean?
----@field source any
-
----@class mini_gas.GameplayAbility
----运行时实例保留实例 id、def_id 与运行时字段，配置通过 defs 查找
----@field id integer 运行时实例唯一 ID
----@field def_id mini_gas.AbilityId 配置 ID
----@field stack number
----@field is_active boolean
----@field cooldown_remaining number
----@field listener? fun(payload:table?)
----@field spawned_effects integer[] 产生的 Effect 实例 ID 列表
-```
-
-技能操作：
-
-```lua
----@param def mini_gas.GameplayAbilityDef
----@param stack? number
----@return mini_gas.GameplayAbility
-function GameplayAbility.new(def, stack) end
-
----@param state mini_gas.EntityState
----@param defs mini_gas.Defs
----@param ability mini_gas.GameplayAbility
----@param payload? table
----@return boolean
-function ability_mod.can_activate(state, defs, ability, payload) end
-
----@param ability mini_gas.GameplayAbility
----@return boolean
-function ability_mod.activate(ability) end
-
----@param ability mini_gas.GameplayAbility
----@param defs mini_gas.Defs
-function ability_mod.end_ability(ability, defs) end
-```
-
-#### 5.3.7 实体状态
-
-`EntityState` 不持有任何配置定义或下划线查找表。
-
-```lua
----@class mini_gas.EntityState
----@field attributes table<mini_gas.AttributeId, number>
----@field abilities table<string, mini_gas.GameplayAbility>
----@field effects table<string, mini_gas.GameplayEffect>
----@field tags mini_gas.GameplayTagContainer
----@field event_listeners table<mini_gas.GameplayEventId, fun(payload: table?)[]>
----@field tasks mini_gas.GameplayTask[]
----@field source any
-```
-
-#### 5.3.8 世界状态
-
-```lua
----@class mini_gas.WorldState
----@field entities table<string, mini_gas.EntityState>
-```
-
-注册实体为工具函数：
-
-```lua
----@param world mini_gas.WorldState
----@param id string
----@param state mini_gas.EntityState
-function mini_gas.register_entity(world, id, state) end
-```
-
-#### 5.3.9 能力系统组件
-
-`MiniASC` 是**无状态**的函数集合。需要读取或注册 Def 的操作接收 `defs` 作为第二个参数；其余操作保持简洁签名。
-
-```lua
----@class mini_gas.MiniASC
-local MiniASC = {}
-
-function MiniASC.register_attributes(state, defs, attr_defs) end
-function MiniASC.give_ability(state, defs, ability_def, stack?) end
-function MiniASC.remove_ability(state, defs, ability_id) end
-function MiniASC.set_ability_stack(state, ability_id, stack) end
-function MiniASC.try_activate_ability(state, defs, ability_id, payload?) end
-function MiniASC.apply_effect(state, defs, effect_def, stack?) end -- 返回 integer|nil
-function MiniASC.remove_effect(state, defs, effect_id) end
-function MiniASC.set_effect_stack(state, effect_id, stack) end
-function MiniASC.add_tag(state, tag) end
-function MiniASC.remove_tag(state, tag) end
-function MiniASC.has_tag(state, tag) end
-function MiniASC.dispatch_event(state, event, payload?) end
-function MiniASC.listen_event(state, event, listener) end
-function MiniASC.update(state, defs, dt) end
-function MiniASC.update_world(world, defs, dt) end
-function MiniASC.get_base(state, attr) end
-function MiniASC.get_current(state, defs, attr) end
-function MiniASC.set_current(state, defs, attr, value) end
+---@field effects mini_gas.ID[]
+---@field can_activate? mini_gas.AbilityActivateCondition | mini_gas.AbilityActivateConditionFunc
 ```
 
 ---

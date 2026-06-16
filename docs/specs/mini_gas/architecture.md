@@ -1,129 +1,78 @@
 
-## 3. 核心设计原则
+## 1. 核心设计原则
 
-### 3.1 独立无依赖
+### 1.1 快照式全量求值
 
-`mini-gas` 仅依赖 Lua 标准库，不依赖任何外部 GAS 库或第三方库。所有类型、工具函数均在 `lua_lib/mini_gas` 内自包含。
+MiniGas V2 不维护运行时状态，也不推进时间。调用方持有世界状态、实体模块、世界模块与配置定义，通过 `ASC.evaluate` 一次性计算世界最终状态。
 
-### 3.2 Stack 驱动堆叠，子类实现成长
+### 1.2 接口化解耦
 
-`mini-gas` 基类只保留运行时必需字段。`GameplayAbility` / `GameplayEffect` 的 `stack` 字段描述堆叠层数；而等级、成长曲线等由业务子类在 `Def` 中自行携带（如 `level` 字段），配置集中存放在 `Defs` 表中。公式函数通过运行时实例的 `id` 从 `defs` 读取这些子类字段完成数值缩放：
+库只定义访问接口（`IEntityModule`、`IWorldModule`、`IEvaluation`），不强制使用特定的状态结构。业务方可以使用普通 Lua 表、ECS、数据库行或网络同步状态。
 
-- `AbilityDef.cooldown` / `AbilityDef.cost[attr]`：`fun(self: GameplayAbility): number`
-- `EffectDef.duration` / `EffectDef.period`：`fun(self: GameplayEffect): number`
-- `ModifierDef.value`（Compound）：`fun(self: Modifier, v: number): number`
+### 1.3 被动-only
 
-运行时实例不持有 `def` 引用；需要 Def 数据时通过 `defs.ability_defs[self.def_id]`、`defs.effect_defs[self.def_id]` 或 `defs.effect_defs[mod.def_id].modifiers[mod.index]` 查找。基类不预定义 `level`，避免把成长模型硬编码进框架。
+V2 仅支持 `Passive` 能力激活策略。能力在满足条件时自动生效，无主动触发、冷却、消耗、Stack 等机制。
 
-### 3.3 无魔术字符串
+### 1.4 标签驱动
 
-所有标识符均通过 `@enum` 或 `@class` 定义，且其值对应策划配置的 `alias`（`string | integer`）：
-
-- 属性名：`mini_gas.EAttribute`（框架不预定义业务属性；由策划配置）
-- 标签名：`mini_gas.ETag`（框架不预定义业务标签；由策划配置）
-- 技能 ID：`mini_gas.EAbilityId`（框架不预定义业务技能；由策划配置）
-- 效果 ID：`mini_gas.EEffectId`（框架不预定义业务效果；由策划配置）
-- 事件名：`mini_gas.EGameplayEvent`（框架仅预定义生命周期事件；业务事件由策划配置）
-- 修饰操作：`mini_gas.EModifierOp`
-- 生命周期策略：`mini_gas.EDurationPolicy`
-- 技能激活策略：`mini_gas.EAbilityActivationPolicy`
-
-业务代码禁止直接书写 `"attr.max_hp"`、`"Add"`、`"ability.attack"` 等字面量。业务 ID 应由策划配置并通过 `ConfigAdapter` 映射到项目级 `@enum`。
-
-### 3.4 运行时状态轻量、Def 外置
-
-`mini-gas` 的运行时状态对象（`EntityState` / `Modifier` / `GameplayEffect` / `GameplayAbility` / `GameplayTask`）均为无元表的普通 Lua 表。`GameplayAbility` / `GameplayEffect` 的运行时实例保留运行时生成的唯一 `id`（实例 ID）、`def_id`（配置 ID）与运行时字段；`Modifier` 的运行时实例仅保留 `def_id`（所属 Effect 的配置 ID）、`index` 与 `stack`，并被包含于 `GameplayEffect.modifiers` 中。它们均不引用外部 Def，也不复制配置字段；需要 `require_tags`、数值公式等字段时，通过传入的 `defs` 查找。
-
-配置定义集中存放在 `Defs` 表中，由调用方持有，并在需要的 API 调用中传入。若业务需要完全自包含的快照，可在序列化前将 Def 数据合并到实例中。
-
-### 3.5 事件驱动
-
-技能激活、效果触发、标签变化、属性变化均通过 `GameplayEvent` 进行通知，便于业务系统扩展。
-
-```mermaid
-%%{init: {'theme': 'neutral'}}%%
-mindmap
-  root((核心设计原则))
-    独立无依赖
-      不依赖外部 GAS 库
-      不依赖第三方库
-      仅 Lua 标准库
-    Stack 驱动堆叠，子类实现成长
-      GameplayAbility.stack
-      GameplayEffect.stack
-      子类 Def 可携带 level
-      按类型公式函数
-    无魔术字符串
-      idAliasText["alias: string | integer"]
-      项目级 @enum
-      ConfigAdapter 映射
-    状态完全自包含
-      EntityState 外置
-      Defs 分离
-      便于序列化
-      便于持久化
-    事件驱动
-      Ability 激活
-      Effect 应用/移除
-      Attribute 变化
-      Tag 变化
-```
+层级标签是能力激活与 Modifier 生效的核心条件。通过 `allof_tags`、`anyof_tags`、`noneof_tags` 实现复杂的条件加成。
 
 ---
 
-## 4. 架构
+## 2. 架构
 
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
 flowchart TD
-    A[外部配置源<br/>Excel / JSON / DB / 策划脚本 / 硬编码] -->|原始配置| B[ConfigAdapter<br/>配置适配器]
-    B -->|AbilityDef / EffectDef /<br/>AttributeDef| D[mini_gas.Defs]
-    D -->|defs| C[mini_gas.MiniASC]
-    E[EntityState<br/>业务方持有<br/>可序列化] -->|state| C
-    W[WorldState<br/>table<EntityId, EntityState>] -->|world| C
-    C -->|修改后的 state| E
-    C -->|修改后的 world| W
-    C -->|计算结果| F[业务系统使用方<br/>战斗 / 技能 / VIP / 道具 / 建筑 / 任务 / 成长]
-```
-
-```mermaid
-%%{init: {'theme': 'neutral'}}%%
-mindmap
-  root((类型体系))
-    idEnum["@enum"]
-      EModifierOp
-      EDurationPolicy
-      EStackingPolicy
-      EAbilityActivationPolicy
-      EAttribute
-      ETag
-      EAbilityId
-      EEffectId
-      EGameplayEvent
-    idClass["@class"]
-      MiniASC
-      Defs
-      EntityState
-      WorldState
-      GameplayAbility
-      GameplayAbilityDef
-      GameplayEffect
-      EffectDef
-      Modifier
-      ModifierDef
-      AttributeDef
-      GameplayTagContainer
-      GameplayTask
-    idAlias["@alias"]
-      TagId
-      AttributeId
-      AbilityId
-      EffectId
-      GameplayEventId
-      ConfigAdapter
+    A[业务状态<br/>EntityState / WorldState] -->|通过 IEntityModule / IWorldModule| B[mini_gas.ASC]
+    C[业务配置<br/>Defs] -->|attribute_defs / effect_defs / ability_defs| B
+    B -->|IEvaluation 回调| D[标签授予 / 属性变化]
+    D -->|写回业务状态| A
 ```
 
 ---
+
+## 3. 接口说明
+
+### 3.1 IEntityModule
+
+提供访问实体状态的函数。所有迭代器均返回 `(iterator, state)` 二元组。
+
+```lua
+---@class mini_gas.IEntityModule
+---@field static_tags fun(entity: mini_gas.IEntityState): mini_gas.Iterator, any
+---@field static_tags_size fun(entity: mini_gas.IEntityState): integer
+---@field has_static_tag fun(entity: mini_gas.IEntityState, tag: mini_gas.Tag): boolean
+---@field attributes fun(entity: mini_gas.IEntityState): mini_gas.Iterator, any
+---@field attributes_size fun(entity: mini_gas.IEntityState): integer
+---@field has_attribute fun(entity: mini_gas.IEntityState, id: mini_gas.ID): boolean
+---@field get_attribute fun(entity: mini_gas.IEntityState, id: mini_gas.ID): number
+---@field static_abilities fun(entity: mini_gas.IEntityState): mini_gas.Iterator, any
+---@field static_abilities_size fun(entity: mini_gas.IEntityState): integer
+---@field has_static_ability fun(entity: mini_gas.IEntityState, def_id: mini_gas.ID): boolean
+```
+
+### 3.2 IWorldModule
+
+提供访问世界状态的函数。
+
+```lua
+---@class mini_gas.IWorldModule
+---@field entities fun(context: mini_gas.IContext, world: mini_gas.IWorldState): mini_gas.Iterator, any
+---@field entities_size fun(context: mini_gas.IContext, world: mini_gas.IWorldState): integer
+---@field has_entity fun(context: mini_gas.IContext, world: mini_gas.IWorldState, id: mini_gas.ID): boolean
+---@field get_entity fun(context: mini_gas.IContext, world: mini_gas.IWorldState, id: mini_gas.ID): mini_gas.IEntityState, mini_gas.IEntityModule
+```
+
+### 3.3 IEvaluation
+
+求值回调接口，由业务方实现。
+
+```lua
+---@class mini_gas.IEvaluation
+---@field grant_tags fun(context: mini_gas.IContext, world: mini_gas.IWorldState, defs: mini_gas.Defs, entity: mini_gas.IEntityState, src_entity_id: mini_gas.ID, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, tags: mini_gas.Tag[], ...: unknown)
+---@field apply_attribute fun(context: mini_gas.IContext, world: mini_gas.IWorldState, defs: mini_gas.Defs, entity: mini_gas.IEntityState, src_entity_id: mini_gas.ID, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, id: mini_gas.ID, value: number, ...: unknown)
+```
 
 ---
 

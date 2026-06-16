@@ -5,20 +5,12 @@
 lua_lib/
 └── mini_gas/                      -- 独立目录
     ├── init.lua                   -- 模块入口，导出所有公共 API
-    ├── types.lua                  -- LuaCATS 类型定义集中文件（不含枚举）
-    ├── state.lua                  -- EntityState / WorldState / Defs / register_entity
-    ├── asc.lua                    -- MiniASC 无状态函数集合
-    ├── ability.lua                -- GameplayAbility 运行时实例
-    ├── effect.lua                 -- GameplayEffect 运行时实例
-    ├── modifier.lua               -- Modifier 聚合逻辑
-    ├── attribute.lua              -- Attribute 数值工具函数（clamp / calc_base）
-    ├── tag.lua                    -- GameplayTagContainer 与标签匹配
-    ├── event.lua                  -- GameplayEvent 派发与监听
-    ├── task.lua                   -- GameplayTask 轻量异步任务
-    └── enum.lua                   -- 所有枚举常量定义（@enum）
+    ├── types.lua                  -- LuaCATS 类型定义集中文件
+    ├── enum.lua                   -- 枚举常量定义
+    └── asc.lua                    -- 核心求值与标签匹配
 ```
 
-> `mini-gas` 为自包含实现，所有代码均在 `lua_lib/mini_gas/` 内，不依赖任何外部 GAS 库。
+> MiniGas V2 为自包含实现，所有代码均在 `lua_lib/mini_gas/` 内，不依赖任何外部 GAS 库。
 
 ---
 
@@ -30,79 +22,52 @@ lua_lib/
 local mini_gas = require("mini_gas")
 ```
 
-### 10.2 EntityState
+### 10.2 枚举
 
-| 方法 | 说明 |
+| 字段 | 说明 |
 |------|------|
-| `EntityState.new()` | 创建新的空实体状态（可序列化的 Lua 表） |
+| `mini_gas.EModifierOp` | Add / Multiply / Override |
+| `mini_gas.EAbilityActivationPolicy` | Passive |
+| `mini_gas.EEffectTarget` | Self / Other / All |
 
-### 10.3 WorldState
-
-| 方法 | 说明 |
-|------|------|
-| `WorldState.new()` | 创建新的世界状态（`table<EntityId, EntityState>`） |
-| `mini_gas.register_entity(world, id, state)` | 注册实体状态到 WorldState（工具函数） |
-
-### 10.4 Defs
-
-| 方法 | 说明 |
-|------|------|
-| `Defs.new()` | 创建新的配置定义表，包含 `attribute_defs` / `ability_defs` / `effect_defs` |
-
-### 10.5 MiniASC
-
-所有 `MiniASC` 方法均为无状态函数，第一个参数为 `state` 或 `world`。需要读取/注册 Def 的方法接收 `defs` 作为第二个参数。
-
-| 方法 | 说明 |
-|------|------|
-| `MiniASC.register_attributes(state, defs, attr_defs)` | 批量注册属性定义到 `defs` 并初始化 `state.attributes` |
-| `MiniASC.give_ability(state, defs, ability_def, stack?)` | 授予技能 |
-| `MiniASC.remove_ability(state, defs, ability_id)` | 移除技能 |
-| `MiniASC.set_ability_stack(state, ability_id, stack)` | 设置技能 Stack |
-| `MiniASC.try_activate_ability(state, defs, ability_id, payload?)` | 尝试激活技能 |
-| `MiniASC.apply_effect(state, defs, effect_def, stack?)` | 应用效果；返回运行时实例 ID（Instant 效果返回 `nil`） |
-| `MiniASC.remove_effect(state, defs, effect_id)` | 按配置 ID 移除效果 |
-| `MiniASC.set_effect_stack(state, effect_id, stack)` | 设置效果 Stack |
-| `MiniASC.add_tag(state, tag)` | 添加标签 |
-| `MiniASC.remove_tag(state, tag)` | 移除标签 |
-| `MiniASC.has_tag(state, tag)` | 判断是否包含标签 |
-| `MiniASC.dispatch_event(state, event, payload?)` | 派发事件 |
-| `MiniASC.listen_event(state, event, listener)` | 监听事件 |
-| `MiniASC.update(state, defs, dt)` | 推进时间并触发周期效果、冷却 |
-| `MiniASC.update_world(world, defs, dt)` | 批量推进 WorldState 中所有实体的生命周期 |
-| `MiniASC.get_base(state, attr)` | 获取属性 Base 值 |
-| `MiniASC.get_current(state, defs, attr)` | 获取属性 Current 值 |
-| `MiniASC.set_current(state, defs, attr, value)` | 设置属性 Current 值 |
-
-### 10.6 工具函数
+### 10.3 标签匹配
 
 ```lua
----注入日志句柄（省略或传 nil 时关闭日志）
----@param logger { warn: fun(msg: string) }|nil
-function mini_gas.set_logger(logger) end
+---层级标签匹配
+---@param a mini_gas.Tag
+---@param b mini_gas.Tag
+---@return boolean
+function mini_gas.match_tag(a, b) end
 
----将原始配置批量转换为 EffectDef
----@param raw_configs any[]
----@param adapter mini_gas.ConfigAdapter
----@return mini_gas.EffectDef[]
-function mini_gas.adapt_effects(raw_configs, adapter) end
+---判断实体是否拥有与给定标签模式匹配的标签
+---@param entity mini_gas.IEntityState
+---@param module mini_gas.IEntityModule
+---@param pattern mini_gas.Tag
+---@return boolean
+function mini_gas.entity_match_tag(entity, module, pattern) end
 
----将原始配置批量转换为 AbilityDef
----@param raw_configs any[]
----@param adapter mini_gas.ConfigAdapter
----@return mini_gas.GameplayAbilityDef[]
-function mini_gas.adapt_abilities(raw_configs, adapter) end
-
----计算单个属性的 Current 值（无状态纯函数）
----@param base number
----@param entity_state mini_gas.EntityState
----@param defs mini_gas.Defs
----@param modifiers mini_gas.Modifier[]
----@return number
-function mini_gas.calc_attribute(base, entity_state, defs, modifiers) end
+---判断实体是否满足 allof / anyof / noneof 标签约束
+---@param entity mini_gas.IEntityState
+---@param module mini_gas.IEntityModule
+---@param allof_tags? mini_gas.Tag[]
+---@param anyof_tags? mini_gas.Tag[]
+---@param noneof_tags? mini_gas.Tag[]
+---@return boolean
+function mini_gas.match_tags(entity, module, allof_tags, anyof_tags, noneof_tags) end
 ```
 
----
+### 10.4 快照求值
+
+```lua
+---世界快照求值入口
+---@param context mini_gas.IContext
+---@param world mini_gas.IWorldState
+---@param world_module mini_gas.IWorldModule
+---@param defs mini_gas.Defs
+---@param evaluation mini_gas.IEvaluation
+---@param ... unknown
+function mini_gas.evaluate(context, world, world_module, defs, evaluation, ...) end
+```
 
 ---
 

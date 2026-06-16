@@ -1,171 +1,209 @@
 require("lua_tests.support.env")
 local mini_gas = require("mini_gas")
-local state_mod = require("mini_gas.state")
-local EntityState = mini_gas.EntityState
-local WorldState = mini_gas.WorldState
-local Defs = mini_gas.Defs
-local MiniASC = mini_gas.MiniASC
-local EModifierOp = mini_gas.EModifierOp
-local EDurationPolicy = mini_gas.EDurationPolicy
-local EAbilityActivationPolicy = mini_gas.EAbilityActivationPolicy
 
-describe("mini_gas integration", function()
-    it("heroes, equipment, pets, city and privileges interact via tags", function()
-        -- 项目级枚举（来自策划配置的 alias）
-        local EAttribute = {
-            MaxHp = "attr.max_hp",
-            Hp = "attr.hp",
-            Mp = "attr.mp",
-            Attack = "attr.attack",
-            Defense = "attr.defense",
-            Gold = "attr.gold",
-            Iron = "attr.iron",
-            GoldGainRate = "attr.gold_gain_rate",
-            ExpGainRate = "attr.exp_gain_rate",
-        }
+-- 业务级 ID 与标签
+local ATTR_ATTACK = "attr.attack"
+local ATTR_GOLD = "attr.gold"
 
-        local ETag = {
-            State_Combat = "state.combat",
-            Pet_Active = "pet.active",
-            Buff_Vip = "buff.vip",
-            State_Silenced = "state.silenced",
-        }
+local TAG_PET_ACTIVE = "pet.active"
+local TAG_VIP = "buff.vip"
+local TAG_COMMANDER = "role.commander"
+local TAG_AURA = "buff.commander_aura"
 
-        local EAbilityId = {
-            HeroAttack = "ability.hero_attack",
-        }
+local ABILITY_SWORD = "ability.equipment.sword"
+local ABILITY_VIP = "ability.vip.privilege"
+local ABILITY_PET = "ability.pet.dragon"
+local ABILITY_BUILDING = "ability.building.gold_mine"
+local ABILITY_AURA = "ability.attack_aura"
 
-        local EEffectId = {
-            EquipSword = "effect.equip.sword",
-            PetDragon = "effect.pet.dragon",
-            VipPrivilege = "effect.vip.privilege",
-            HeroAttackDamage = "effect.hero.attack_damage",
-            BuildingGoldMine = "effect.building.gold_mine",
-            BuildingIronMine = "effect.building.iron_mine",
-        }
+local EFFECT_SWORD = "effect.equipment.sword"
+local EFFECT_VIP = "effect.vip.privilege"
+local EFFECT_PET = "effect.pet.dragon"
+local EFFECT_BUILDING = "effect.building.gold_mine"
+local EFFECT_AURA = "effect.attack_aura"
 
-        local function make_linear(base, growth)
-            return function(_, level)
-                return base + (level - 1) * growth
-            end
-        end
+local function make_entity_module(entity)
+    return {
+        static_tags = function() return next, entity.static_tags end,
+        static_tags_size = function()
+            local n = 0
+            for _ in pairs(entity.static_tags) do n = n + 1 end
+            return n
+        end,
+        has_static_tag = function(_, tag) return entity.static_tags[tag] ~= nil end,
+        attributes = function() return next, entity.attrs end,
+        attributes_size = function()
+            local n = 0
+            for _ in pairs(entity.attrs) do n = n + 1 end
+            return n
+        end,
+        has_attribute = function(_, id) return entity.attrs[id] ~= nil end,
+        get_attribute = function(_, id) return entity.attrs[id] or 0 end,
+        static_abilities = function() return next, entity.static_abilities end,
+        static_abilities_size = function()
+            local n = 0
+            for _ in pairs(entity.static_abilities) do n = n + 1 end
+            return n
+        end,
+        has_static_ability = function(_, def_id) return entity.static_abilities[def_id] ~= nil end,
+    }
+end
 
-        local state = EntityState.new()
-        local defs = Defs.new()
+local function make_world_module(world, modules)
+    return {
+        entities = function(_, _)
+            return function(entities, id)
+                local next_id, next_state = next(entities, id)
+                if next_id == nil then return nil end
+                return next_id, next_state, modules[next_id]
+            end, world.entities
+        end,
+        entities_size = function()
+            local n = 0
+            for _ in pairs(world.entities) do n = n + 1 end
+            return n
+        end,
+        has_entity = function(_, _, id) return world.entities[id] ~= nil end,
+        get_entity = function(_, _, id) return world.entities[id], modules[id] end,
+    }
+end
 
-        MiniASC.register_attributes(state, defs, {
-            { name = EAttribute.MaxHp,        base = 1000, min = 0 },
-            { name = EAttribute.Hp,           base = 1000, min = 0, max = 1000 },
-            { name = EAttribute.Mp,           base = 200,  min = 0, max = 200 },
-            { name = EAttribute.Attack,       base = 100,  min = 0 },
-            { name = EAttribute.Defense,      base = 50,   min = 0 },
-            { name = EAttribute.Gold,         base = 0,    min = 0 },
-            { name = EAttribute.Iron,         base = 0,    min = 0 },
-            { name = EAttribute.GoldGainRate, base = 1.0,  min = 0 },
-            { name = EAttribute.ExpGainRate,  base = 1.0,  min = 0 },
-        })
-
-        -- 装备：传说之剑
-        MiniASC.apply_effect(state, defs, {
-            id = EEffectId.EquipSword,
-            duration_policy = EDurationPolicy.Infinite,
-            modifiers = {
-                { attribute = EAttribute.Attack,  op = EModifierOp.Add, value = 80 },
-                { attribute = EAttribute.Defense, op = EModifierOp.Add, value = 30 },
+describe("mini_gas v2 integration", function()
+    it("full example from v2 spec", function()
+        local defs = {
+            attribute_defs = {
+                [ATTR_ATTACK] = { id = ATTR_ATTACK, default = 100 },
+                [ATTR_GOLD] = { id = ATTR_GOLD, default = 0 },
             },
-        }, 1)
-
-        -- 宠物：小龙（5 级）
-        MiniASC.apply_effect(state, defs, {
-            id = EEffectId.PetDragon,
-            duration_policy = EDurationPolicy.Infinite,
-            granted_tags = { ETag.Pet_Active },
-            modifiers = {
-                { attribute = EAttribute.Attack, op = EModifierOp.Add, value = make_linear(20, 5)(nil, 5) },
-            },
-        }, 1)
-
-        -- VIP 特权
-        MiniASC.apply_effect(state, defs, {
-            id = EEffectId.VipPrivilege,
-            duration_policy = EDurationPolicy.Infinite,
-            granted_tags = { ETag.Buff_Vip },
-            modifiers = {
-                { attribute = EAttribute.GoldGainRate, op = EModifierOp.Multiply, value = 1.2 },
-                { attribute = EAttribute.ExpGainRate,  op = EModifierOp.Multiply, value = 1.1 },
-            },
-        }, 1)
-
-        -- 主动技能：普通攻击
-        local hero_attack_def = {
-            id = EAbilityId.HeroAttack,
-            activation_policy = EAbilityActivationPolicy.Active,
-            require_tags = { ETag.Pet_Active },
-            blocked_tags = { ETag.State_Silenced },
-            cooldown = 1.5,
-            cost = { [EAttribute.Mp] = 10 },
-            effects = {
-                {
-                    id = EEffectId.HeroAttackDamage,
-                    duration_policy = EDurationPolicy.Instant,
+            effect_defs = {
+                [EFFECT_SWORD] = {
+                    id = EFFECT_SWORD,
+                    modifiers = { { attribute = { ATTR_ATTACK, 50 }, op = mini_gas.EModifierOp.Add } },
+                },
+                [EFFECT_VIP] = {
+                    id = EFFECT_VIP,
+                    modifiers = { { attribute = { ATTR_GOLD, 1.2 }, op = mini_gas.EModifierOp.Multiply, allof_tags = { TAG_VIP } } },
+                },
+                [EFFECT_PET] = {
+                    id = EFFECT_PET,
+                    modifiers = { { attribute = { ATTR_ATTACK, 40 }, op = mini_gas.EModifierOp.Add, allof_tags = { TAG_PET_ACTIVE } } },
+                },
+                [EFFECT_BUILDING] = {
+                    id = EFFECT_BUILDING,
                     modifiers = {
-                        { attribute = EAttribute.Hp, op = EModifierOp.Add, value = -100 },
+                        {
+                            attribute = function(_, _, _, _, _, _, extra)
+                                local world_level = extra and extra.world_level or 1
+                                return ATTR_GOLD, 100 * world_level
+                            end,
+                            op = mini_gas.EModifierOp.Add,
+                        },
+                    },
+                },
+                [EFFECT_AURA] = {
+                    id = EFFECT_AURA,
+                    target = mini_gas.EEffectTarget.All,
+                    allof_tags = { TAG_COMMANDER },
+                    grant_tags = { TAG_AURA },
+                    modifiers = { { attribute = { ATTR_ATTACK, 1.2 }, op = mini_gas.EModifierOp.Multiply } },
+                },
+            },
+            ability_defs = {
+                [ABILITY_SWORD] = {
+                    id = ABILITY_SWORD,
+                    activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_SWORD },
+                    can_activate = function() return true end,
+                },
+                [ABILITY_VIP] = {
+                    id = ABILITY_VIP,
+                    activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_VIP },
+                    can_activate = function() return true end,
+                },
+                [ABILITY_PET] = {
+                    id = ABILITY_PET,
+                    activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_PET },
+                    can_activate = function() return true end,
+                },
+                [ABILITY_BUILDING] = {
+                    id = ABILITY_BUILDING,
+                    activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_BUILDING },
+                    can_activate = function()
+                        return true, { world_level = 3 }
+                    end,
+                },
+                [ABILITY_AURA] = {
+                    id = ABILITY_AURA,
+                    activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_AURA },
+                    can_activate = {
+                        allof_tags = { TAG_COMMANDER },
+                        requires_count = 2,
+                        include_self = true,
                     },
                 },
             },
         }
-        MiniASC.give_ability(state, defs, hero_attack_def, 1)
 
-        -- 金矿
-        MiniASC.apply_effect(state, defs, {
-            id = EEffectId.BuildingGoldMine,
-            duration_policy = EDurationPolicy.Infinite,
-            period = 60,
-            modifiers = {
-                { attribute = EAttribute.Gold, op = EModifierOp.Add, value = 100 },
-                { attribute = EAttribute.Gold, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Buff_Vip } },
+        local hero_state = {
+            attrs = { [ATTR_ATTACK] = 100, [ATTR_GOLD] = 0 },
+            static_tags = { [TAG_PET_ACTIVE] = true, [TAG_VIP] = true },
+            static_abilities = {
+                [ABILITY_SWORD] = true,
+                [ABILITY_VIP] = true,
+                [ABILITY_PET] = true,
+                [ABILITY_BUILDING] = true,
             },
-        }, 1)
+        }
+        local commander_state = {
+            attrs = { [ATTR_ATTACK] = 100 },
+            static_tags = { [TAG_COMMANDER] = true },
+            static_abilities = { [ABILITY_AURA] = true },
+        }
+        local ally_state = {
+            attrs = { [ATTR_ATTACK] = 100 },
+            static_tags = { [TAG_COMMANDER] = true },
+            static_abilities = {},
+        }
 
-        -- 铁矿厂
-        MiniASC.apply_effect(state, defs, {
-            id = EEffectId.BuildingIronMine,
-            duration_policy = EDurationPolicy.Infinite,
-            period = 60,
-            modifiers = {
-                { attribute = EAttribute.Iron, op = EModifierOp.Add, value = 50 },
-                { attribute = EAttribute.Iron, op = EModifierOp.Multiply, value = 1.2, require_tags = { ETag.Buff_Vip } },
-            },
-        }, 1)
+        local modules = {
+            hero = make_entity_module(hero_state),
+            commander = make_entity_module(commander_state),
+            ally = make_entity_module(ally_state),
+        }
+        local world_state = { entities = { hero = hero_state, commander = commander_state, ally = ally_state } }
+        local world_module = make_world_module(world_state, modules)
 
-        -- WorldState 管理
-        local world = WorldState.new()
-        state_mod.register_entity(world, "player", state)
+        local results = {}
+        local granted_tags = {}
+        local evaluation = {
+            grant_tags = function(_, _, _, entity, src_entity_id, _, effect_def_id, tags)
+                granted_tags[entity] = granted_tags[entity] or {}
+                for _, tag in ipairs(tags) do
+                    table.insert(granted_tags[entity], { tag = tag, src = src_entity_id, effect = effect_def_id })
+                end
+            end,
+            apply_attribute = function(_, _, _, entity, _, _, _, attr_id, value)
+                results[entity] = results[entity] or {}
+                results[entity][attr_id] = (results[entity][attr_id] or 0) + value
+            end,
+        }
 
-        MiniASC.update_world(world, defs, 120)
+        mini_gas.evaluate({}, world_state, world_module, defs, evaluation)
 
-        -- 携带宠物且未被沉默，技能可以激活
-        local ok1 = MiniASC.try_activate_ability(state, defs, EAbilityId.HeroAttack)
-        assert.is_true(ok1)
+        local function final_attr(entity, attr_id)
+            return modules[entity].get_attribute(world_state.entities[entity], attr_id) + (results[world_state.entities[entity]] and results[world_state.entities[entity]][attr_id] or 0)
+        end
 
-        -- 被沉默时无法激活
-        MiniASC.add_tag(state, ETag.State_Silenced)
-        local ok2 = MiniASC.try_activate_ability(state, defs, EAbilityId.HeroAttack)
-        assert.is_false(ok2)
-        MiniASC.remove_tag(state, ETag.State_Silenced)
+        assert.near(190, final_attr("hero", ATTR_ATTACK), 0.0001)
+        assert.near(360, final_attr("hero", ATTR_GOLD), 0.0001)
+        assert.near(120, final_attr("commander", ATTR_ATTACK), 0.0001)
+        assert.near(120, final_attr("ally", ATTR_ATTACK), 0.0001)
 
-        -- 验证最终数值
-        assert.equal(220, MiniASC.get_current(state, defs, EAttribute.Attack))
-        assert.equal(80, MiniASC.get_current(state, defs, EAttribute.Defense))
-        assert.near(1.2, MiniASC.get_current(state, defs, EAttribute.GoldGainRate), 0.0001)
-        assert.near(240, MiniASC.get_current(state, defs, EAttribute.Gold), 0.0001)
-        assert.near(120, MiniASC.get_current(state, defs, EAttribute.Iron), 0.0001)
-
-        -- 技能消耗了 Mp
-        assert.equal(190, MiniASC.get_current(state, defs, EAttribute.Mp))
-
-        -- 整个世界状态可序列化为纯 Lua 表
-        assert.is_table(world.entities)
-        assert.is_table(world.entities.player)
+        assert.is_not_nil(granted_tags[commander_state])
+        assert.is_not_nil(granted_tags[ally_state])
     end)
 end)
