@@ -14,6 +14,7 @@
 - 库在聚合所有生效的 Modifier 后，会按 `Defs.attribute_defs[id]` 中的 `min` 与 `max` 对最终值做截断；未定义 `min` 或 `max` 时，对应方向不限制。
 - 最终传给 `IEvaluation.apply` 的 `attr_changes` 中每个条目的 `value` 已经是截断后的 `new_value - old_value`（add 语义），按 owner 级别聚合。
 - `IEvaluation.apply` 的 `tags` 参数为当前 owner 授予的所有标签集合，类型为 `table<mini_gas.Tag, boolean>`，键为标签，值为 `true`。
+- `tags` 与 `attr_changes` 由库持有所有权，`apply` 返回后会被立即回收；业务方如需跨回调保留，必须在 `apply` 内部复制。
 
 ### 6.3 Modifier 聚合
 

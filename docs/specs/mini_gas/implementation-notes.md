@@ -8,7 +8,9 @@
 5. **ModifierAttributeEval 参数**：首次调用时固定传入 `id = nil, value = nil`，随后才是 `can_activate` 产生的上下文或调用者传入的上下文。函数签名同时接收 `world_module` 与 `entity_module`。
 6. **数值稳定**：Modifier 聚合顺序固定：先累加 Add，再连乘 Multiply，最后判断 Override；最终值按 `AttributeDef.min/max` 截断。
 7. **单一 apply 与 owner 级聚合**：每个 owner 处理完毕后，只调用一次 `IEvaluation.apply`，传递聚合后的标签集合 `tags`（`table<mini_gas.Tag, boolean>`）与 `attr_changes` 数组（`AttrChangeEntry[]`）。Add 语义下 `value = new_value - base`，业务方通过“旧值 + 差值”得到最终值。
-8. **对象池**：`asc.lua` 内部使用模块级对象池复用求值过程中产生的临时表（tags、attr_changes 与 owner_mods 等），降低 GC 压力。回调返回后这些表会被立即回收，业务方如需保留必须在 `apply` 内复制。
+8. **对象池与所有权**：`asc.lua` 内部使用模块级对象池复用求值过程中产生的所有临时表（evaluate_args、modifier_extra、targets、tags、attr_changes、owner_mods 及其嵌套表等），降低 GC 压力。
+   - `IEvaluation.apply` 收到的 `tags` 与 `attr_changes` 归库所有，`apply` 返回后会被立即回收。
+   - 业务方如需在 `apply` 返回后继续保留数据，必须在回调内部完成复制。
 9. **错误隔离**：非法配置（不存在的 AbilityDef / EffectDef）静默跳过，不中断其他计算。
 
 ---
