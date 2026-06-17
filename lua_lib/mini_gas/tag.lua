@@ -13,7 +13,7 @@ function M.match_tag(a, b)
     if b == "" then
         return false
     end
-    return a:find(b, 1, true) == 1 and a:byte(#b + 1) == 46
+    return #a > #b and a:find(b, 1, true) == 1 and a:byte(#b + 1) == 46
 end
 
 --- 判断实体是否拥有与给定标签模式匹配的标签
