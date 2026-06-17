@@ -27,7 +27,7 @@
 
 ```
 base = IEntityModule.get_attribute(entity, id)
-if attr_entry[1] ~= nil then final = attr_entry[1]
+if attr_entry[1] ~= false then final = attr_entry[1]
 else final = (base + attr_entry[2]) * attr_entry[3] end
 final = clamp(final, min, max)
 attributes[id] = final - base

@@ -92,13 +92,13 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
         local deltas = pool.acquire_table()
         for attr_id, attr_entry in pairs(attributes) do
             local base = target_module.get_attribute(target_entity, attr_id)
-            local final = attr_entry[1] ~= nil and attr_entry[1] or (base + attr_entry[2]) * attr_entry[3]
+            local final = attr_entry[1] ~= false and attr_entry[1] or (base + attr_entry[2]) * attr_entry[3]
             local attr_def = defs.attribute_defs[attr_id]
             if attr_def then
                 final = clamp(final, attr_def.min, attr_def.max)
             end
             local delta = final - base
-            if delta ~= 0 or attr_entry[1] ~= nil then
+            if delta ~= 0 or attr_entry[1] ~= false then
                 deltas[attr_id] = delta
             end
             pool.release_table(attr_entry)

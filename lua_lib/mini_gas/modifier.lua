@@ -9,11 +9,13 @@ local M = {}
 
 --- 解析 ModifierDef.attribute，递归收集所有 (id, value) 对
 --- 返回的数组中按 [i * 2 - 1] = id, [i * 2] = value 紧凑存储，均来自通用对象池
+--- 同时返回第二个值 invalid，避免在数组池的表上设置非数字键
 ---@param context mini_gas.IContext
 ---@param entity mini_gas.IEntityState
 ---@param modifier_def mini_gas.ModifierDef
 ---@param modifier_args table
 ---@return table
+---@return boolean
 function M.resolve_modifier_attribute(context, entity, modifier_def, modifier_args)
     local result = pool.acquire_short_array()
     local attr = modifier_def.attribute
@@ -38,11 +40,12 @@ function M.resolve_modifier_attribute(context, entity, modifier_def, modifier_ar
             end
         end
     else
-        result.invalid = true
+        result.n = 0
+        return result, true
     end
 
     result.n = count * 2
-    return result
+    return result, false
 end
 
 --- 对单个 Modifier 进行求值并聚合到 attributes
@@ -95,8 +98,8 @@ function M.evaluate_modifier(
         table.unpack(evaluate_args, 1, evaluate_args.n)
     )
 
-    local pairs_list = M.resolve_modifier_attribute(context, target_entity, modifier_def, modifier_args)
-    if pairs_list.invalid then
+    local pairs_list, invalid = M.resolve_modifier_attribute(context, target_entity, modifier_def, modifier_args)
+    if invalid then
         debug_helper.call_step(debug, context, "invalid_modifier_attribute", owner_id, ability_id, effect_id, modifier_def, target_id)
     end
 
@@ -106,7 +109,8 @@ function M.evaluate_modifier(
         if not attr_entry then
             attr_entry = pool.acquire_table()
             -- attr_entry 使用数组结构：[1] override, [2] add, [3] multiply
-            attr_entry[1] = nil
+            -- 数组池中的表避免 nil 空洞，override 未设置时用 false 占位
+            attr_entry[1] = false
             attr_entry[2] = 0
             attr_entry[3] = 1
             attributes[attr_id] = attr_entry
@@ -121,7 +125,6 @@ function M.evaluate_modifier(
         end
     end
 
-    pairs_list.invalid = nil
     pool.release_short_array(pairs_list)
 
     debug_helper.call_debug(

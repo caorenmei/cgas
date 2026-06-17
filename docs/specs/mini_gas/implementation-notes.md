@@ -14,7 +14,7 @@
    - `short_array_pool`：短数组型临时表，回收时按 `t.n` 将元素置 `false` 并将 `t.n` 设为 `0`；用于 `evaluate_args`、`modifier_args`、`pairs_list` 等生命周期较短或元素较少的数组。
    - `long_array_pool`：长数组型临时表，回收语义与 `short_array_pool` 相同，专门用于生命周期跨越整个求值流程且元素较多的 `active_abilities`。
    - 数组池的表以 `.n` 作为长度标准，不使用 `#` 或 `ipairs`，避免回收残留的 `false` 影响长度计算。
-   - `attributes[attr_id]` 的聚合结构采用数组：`[1]` 为 Override 值，`[2]` 为 Add 累加和，`[3]` 为 Multiply 连乘积。
+   - `attributes[attr_id]` 的聚合结构采用数组：`[1]` 为 Override 值（未覆盖时为 `false`），`[2]` 为 Add 累加和，`[3]` 为 Multiply 连乘积；数组元素避免使用 `nil` 占位，防止数组空洞。
    - `ApplyFun` 收到的 `tags` 与 `attributes` 归库所有，`apply` 返回后会被立即回收。
    - 所有对象池均带有重复释放保护，避免同一张表在池中出现多次。
    - 业务方如需在 `apply` 返回后继续保留数据，必须在回调内部完成复制。
