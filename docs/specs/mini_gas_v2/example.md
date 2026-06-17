@@ -221,8 +221,8 @@ local granted_tags = {}
 
 -- 可选的调试接口
 local debug = {
-    begin_effect = function(context, owner_id, owner_entity, owner_module, ability_def_id, effect_def_id)
-        print("begin effect", effect_def_id, "from", owner_id)
+    begin_effect = function(context, owner_id, owner_entity, owner_module, ability_id, effect_id)
+        print("begin effect", effect_id, "from", owner_id)
     end,
 }
 
@@ -241,8 +241,11 @@ local function apply(context, entity, tags, attributes, ...)
     end
 end
 
+-- 如需调试，将 debug 挂到 context.debug
+context.debug = debug
+
 -- 这里不需要再传入 world_level，因为建筑 Ability 的 can_activate 已经返回了该上下文
-ASC.evaluate(context, debug, apply)
+ASC.evaluate(context, apply)
 
 -- 5. 查看结果
 local function final_attr(entity, attr_id)

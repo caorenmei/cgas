@@ -4,10 +4,16 @@
 ```
 lua_lib/
 └── mini_gas/                      -- 独立目录
-    ├── init.lua                   -- 模块入口，导出所有公共 API
+    ├── init.lua                   -- 模块入口，导出公共 API
     ├── types.lua                  -- LuaCATS 类型定义集中文件
     ├── enum.lua                   -- 枚举常量定义
-    └── asc.lua                    -- 核心求值与标签匹配
+    ├── asc.lua                    -- 核心求值入口与主控流程（轻量）
+    ├── tag.lua                    -- 层级标签匹配工具
+    ├── ability.lua                -- Ability 激活条件与 active_abilities 收集
+    ├── effect.lua                 -- Effect 目标匹配与应用
+    ├── modifier.lua               -- Modifier 解析与属性聚合
+    ├── pool.lua                   -- 分类对象池
+    └── debug.lua                  -- 调试钩子辅助函数
 ```
 
 > MiniGas V2 为自包含实现，所有代码均在 `lua_lib/mini_gas/` 内，不依赖任何外部 GAS 库。
@@ -68,6 +74,19 @@ function mini_gas.evaluate(context, apply, ...) end
 ```
 
 `ApplyFun` 在每个 `target` 实体全部求值完成后调用一次，传递该实体获得的所有授予标签集合（`table<mini_gas.Tag, boolean>`）与属性变化映射。`tags` 与 `attributes` 归库所有，`apply` 返回后会被回收。可选的 `IDebug` 通过 `context.debug` 传入，用于日志或副作用。
+
+### 10.5 内部模块
+
+以下模块为内部实现，不对外暴露，但可通过 `require("mini_gas.xxx")` 在测试或扩展中单独使用：
+
+| 模块 | 说明 |
+|------|------|
+| `mini_gas.tag` | 层级标签匹配 |
+| `mini_gas.ability` | Ability 激活条件与收集 |
+| `mini_gas.effect` | Effect 目标匹配与应用 |
+| `mini_gas.modifier` | Modifier 解析与聚合 |
+| `mini_gas.pool` | 分类对象池 |
+| `mini_gas.debug` | 调试钩子辅助函数 |
 
 ---
 
