@@ -35,6 +35,7 @@
 ---@field world mini_gas.IWorldState 世界状态
 ---@field world_module mini_gas.IWorldModule 访问 world 的模块接口
 ---@field defs mini_gas.Defs 属性、效果、能力定义
+---@field debug? mini_gas.IDebug 可选调试/追踪接口
 --- 业务方可按需要扩展其它字段
 
 --- 实体状态接口，由库的使用者实现
@@ -69,12 +70,12 @@
 --- 调试/追踪接口，所有方法均为可选。
 --- 所有方法尾部的 `...` 均为 `ASC.evaluate` 调用者传入的上下文参数，与 `ModifierAttributeEval` 收到的 `modifier_args` 不同。
 ---@class mini_gas.IDebug
----@field begin_ability? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
----@field end_ability? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
----@field begin_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
----@field end_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
----@field begin_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
----@field end_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field begin_ability? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, ...: unknown)
+---@field end_ability? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, ...: unknown)
+---@field begin_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, ...: unknown)
+---@field end_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, ...: unknown)
+---@field begin_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field end_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
 ---@field step? fun(context: mini_gas.IContext, phase: string, ...: unknown)
 
 --- 最终应用函数：每个实体在全部求值完成后调用一次。

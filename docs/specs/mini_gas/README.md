@@ -122,8 +122,9 @@ local context = {
     world = world,
     world_module = world_module,
     defs = defs,
+    -- debug = my_debug, -- 可选
 }
-mini_gas.evaluate(context, nil, apply)
+mini_gas.evaluate(context, apply)
 
 -- 最终 attack = 100 + 50 = 150
 print(entity_module.get_attribute(entity, ATTR_ATTACK) + (deltas[entity][ATTR_ATTACK] or 0))

@@ -147,7 +147,7 @@ describe("mini_gas v2 asc", function()
 
         local deltas = {}
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply(deltas))
+        mini_gas.evaluate(context, make_apply(deltas))
         assert.equal(50, deltas[entity][ATTR_ATTACK])
     end)
 
@@ -183,7 +183,7 @@ describe("mini_gas v2 asc", function()
 
         local deltas = {}
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply(deltas))
+        mini_gas.evaluate(context, make_apply(deltas))
         assert.equal(40, deltas[entity][ATTR_ATTACK])
     end)
 
@@ -225,7 +225,7 @@ describe("mini_gas v2 asc", function()
 
         local deltas = {}
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply(deltas))
+        mini_gas.evaluate(context, make_apply(deltas))
         assert.near(120, deltas[entity][ATTR_GOLD], 0.0001)
     end)
 
@@ -283,7 +283,7 @@ describe("mini_gas v2 asc", function()
         end
 
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, apply)
+        mini_gas.evaluate(context, apply)
         assert.is_true(entity_tags[commander][TAG_AURA])
         assert.is_true(entity_tags[ally][TAG_AURA])
         assert.near(20, deltas[commander][ATTR_ATTACK], 0.0001)
@@ -337,7 +337,7 @@ describe("mini_gas v2 asc", function()
         end
 
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, apply)
+        mini_gas.evaluate(context, apply)
         assert.equal(2, total_tag_count) -- a and b each receive TAG_AURA once
     end)
 
@@ -381,7 +381,7 @@ describe("mini_gas v2 asc", function()
 
         local deltas = {}
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply(deltas))
+        mini_gas.evaluate(context, make_apply(deltas))
         assert.equal(300, deltas[entity][ATTR_GOLD])
     end)
 
@@ -433,7 +433,7 @@ describe("mini_gas v2 asc", function()
         }
 
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply({}))
+        mini_gas.evaluate(context, make_apply({}))
         assert.equal(2, received_count)
     end)
 
@@ -466,7 +466,7 @@ describe("mini_gas v2 asc", function()
 
         local deltas = {}
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply(deltas))
+        mini_gas.evaluate(context, make_apply(deltas))
         assert.equal(20, deltas[entity][ATTR_ATTACK]) -- 100 + 50 clamped to 120, delta = 20
     end)
 
@@ -514,7 +514,7 @@ describe("mini_gas v2 asc", function()
 
         local deltas = {}
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply(deltas))
+        mini_gas.evaluate(context, make_apply(deltas))
         assert.equal(10, deltas[entity][ATTR_ATTACK])
         assert.equal(5, deltas[entity][ATTR_GOLD])
     end)
@@ -551,7 +551,7 @@ describe("mini_gas v2 asc", function()
 
         local deltas = {}
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, nil, make_apply(deltas))
+        mini_gas.evaluate(context, make_apply(deltas))
         assert.equal(200, deltas[entity][ATTR_ATTACK]) -- override 300 - base 100 = 200
     end)
 
@@ -590,11 +590,11 @@ describe("mini_gas v2 asc", function()
             end_ability = function(_, owner_id)
                 table.insert(events, { "end_ability", owner_id })
             end,
-            begin_effect = function(_, owner_id, _, _, _, effect_def_id)
-                table.insert(events, { "begin_effect", owner_id, effect_def_id })
+            begin_effect = function(_, owner_id, _, _, _, effect_id)
+                table.insert(events, { "begin_effect", owner_id, effect_id })
             end,
-            end_effect = function(_, owner_id, _, _, _, effect_def_id)
-                table.insert(events, { "end_effect", owner_id, effect_def_id })
+            end_effect = function(_, owner_id, _, _, _, effect_id)
+                table.insert(events, { "end_effect", owner_id, effect_id })
             end,
             begin_modifier = function(_, owner_id, _, _, _, _, _, _, target_entity)
                 table.insert(events, { "begin_modifier", owner_id, target_entity })
@@ -608,7 +608,8 @@ describe("mini_gas v2 asc", function()
         }
 
         local context = make_context(world, world_module, defs)
-        mini_gas.evaluate(context, debug, function() end)
+        context.debug = debug
+        mini_gas.evaluate(context, function() end)
 
         assert.equal("step", events[1][1])
         assert.equal("evaluate_start", events[1][2])

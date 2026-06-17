@@ -88,13 +88,20 @@ local function clamp(value, min, max)
     return value
 end
 
---- 模块级表对象池，用于复用 evaluate 内部的临时表
+--- 通用表对象池，用于复用 evaluate 内部的小型临时表
 local table_pool = {}
 
---- 从对象池获取一张已清空的表
+--- 分类对象池
+local tags_pool = {}
+local attrs_pool = {}
+local evaluate_args_pool = {}
+local active_abilities_pool = {}
+
+--- 从指定对象池获取一张已清空的表
+---@param pool table
 ---@return table
-local function acquire_table()
-    local t = table.remove(table_pool)
+local function acquire_from(pool)
+    local t = table.remove(pool)
     if t then
         t.__in_pool = nil
         for k, _ in pairs(t) do
@@ -106,10 +113,10 @@ local function acquire_table()
     return t
 end
 
---- 将表清空并归还对象池
---- 带有重复释放保护，避免同一张表在池中出现多次
+--- 将表清空并归还指定对象池，带有重复释放保护
+---@param pool table
 ---@param t table
-local function release_table(t)
+local function release_to(pool, t)
     if not t or t.__in_pool then
         return
     end
@@ -117,7 +124,67 @@ local function release_table(t)
         t[k] = nil
     end
     t.__in_pool = true
-    table.insert(table_pool, t)
+    table.insert(pool, t)
+end
+
+--- 从通用对象池获取一张已清空的表
+---@return table
+local function acquire_table()
+    return acquire_from(table_pool)
+end
+
+--- 将表清空并归还通用对象池
+---@param t table
+local function release_table(t)
+    release_to(table_pool, t)
+end
+
+--- 从 tags 对象池获取一张已清空的表
+---@return table<mini_gas.Tag, boolean>
+local function acquire_tags()
+    return acquire_from(tags_pool)
+end
+
+--- 将表归还 tags 对象池
+---@param t table
+local function release_tags(t)
+    release_to(tags_pool, t)
+end
+
+--- 从 attrs 对象池获取一张已清空的表
+---@return table
+local function acquire_attrs()
+    return acquire_from(attrs_pool)
+end
+
+--- 将表归还 attrs 对象池
+---@param t table
+local function release_attrs(t)
+    release_to(attrs_pool, t)
+end
+
+--- 从 evaluate_args 对象池获取一张已清空的表
+---@return table
+local function acquire_evaluate_args()
+    return acquire_from(evaluate_args_pool)
+end
+
+--- 将表归还 evaluate_args 对象池
+---@param t table
+local function release_evaluate_args(t)
+    release_to(evaluate_args_pool, t)
+end
+
+--- 从 active_abilities 对象池获取一张已清空的表
+---@return table
+local function acquire_active_abilities()
+    return acquire_from(active_abilities_pool)
+end
+
+--- 将表归还 active_abilities 对象池
+---@param t table
+local function release_active_abilities(t)
+    release_to(active_abilities_pool, t)
 end
 
 --- 调用可选调试钩子
@@ -210,7 +277,7 @@ local function check_can_activate(context, owner_entity, ability_def, evaluate_a
 end
 
 --- 解析 ModifierDef.attribute，递归收集所有 (id, value) 对
---- 返回的数组中每个元素为 { [1] = id, [2] = value }，均来自对象池
+--- 返回的数组中每个元素为 { [1] = id, [2] = value }，均来自通用对象池
 ---@param context mini_gas.IContext
 ---@param entity mini_gas.IEntityState
 ---@param modifier_def mini_gas.ModifierDef
@@ -251,8 +318,8 @@ end
 ---@param owner_id mini_gas.ID
 ---@param owner_entity mini_gas.IEntityState
 ---@param owner_module mini_gas.IEntityModule
----@param ability_def_id mini_gas.ID
----@param effect_def_id mini_gas.ID
+---@param ability_id mini_gas.ID
+---@param effect_id mini_gas.ID
 ---@param modifier_def mini_gas.ModifierDef
 ---@param target_id mini_gas.ID
 ---@param target_entity mini_gas.IEntityState
@@ -266,8 +333,8 @@ local function evaluate_modifier(
     owner_id,
     owner_entity,
     owner_module,
-    ability_def_id,
-    effect_def_id,
+    ability_id,
+    effect_id,
     modifier_def,
     target_id,
     target_entity,
@@ -287,8 +354,8 @@ local function evaluate_modifier(
         owner_id,
         owner_entity,
         owner_module,
-        ability_def_id,
-        effect_def_id,
+        ability_id,
+        effect_id,
         modifier_def,
         target_entity,
         target_module,
@@ -297,7 +364,7 @@ local function evaluate_modifier(
 
     local pairs_list = resolve_modifier_attribute(context, target_entity, modifier_def, modifier_args)
     if pairs_list.invalid then
-        call_step(debug, context, "invalid_modifier_attribute", owner_id, ability_def_id, effect_def_id, modifier_def, target_id)
+        call_step(debug, context, "invalid_modifier_attribute", owner_id, ability_id, effect_id, modifier_def, target_id)
     end
 
     for _, pair in ipairs(pairs_list) do
@@ -333,8 +400,8 @@ local function evaluate_modifier(
         owner_id,
         owner_entity,
         owner_module,
-        ability_def_id,
-        effect_def_id,
+        ability_id,
+        effect_id,
         modifier_def,
         target_entity,
         target_module,
@@ -370,8 +437,8 @@ end
 ---@param owner_id mini_gas.ID
 ---@param owner_entity mini_gas.IEntityState
 ---@param owner_module mini_gas.IEntityModule
----@param ability_def_id mini_gas.ID
----@param effect_def_id mini_gas.ID
+---@param ability_id mini_gas.ID
+---@param effect_id mini_gas.ID
 ---@param effect_def mini_gas.EffectDef
 ---@param target_id mini_gas.ID
 ---@param target_entity mini_gas.IEntityState
@@ -386,8 +453,8 @@ local function evaluate_effect(
     owner_id,
     owner_entity,
     owner_module,
-    ability_def_id,
-    effect_def_id,
+    ability_id,
+    effect_id,
     effect_def,
     target_id,
     target_entity,
@@ -408,8 +475,8 @@ local function evaluate_effect(
         owner_id,
         owner_entity,
         owner_module,
-        ability_def_id,
-        effect_def_id,
+        ability_id,
+        effect_id,
         table.unpack(evaluate_args, 1, evaluate_args.n)
     )
 
@@ -429,8 +496,8 @@ local function evaluate_effect(
                 owner_id,
                 owner_entity,
                 owner_module,
-                ability_def_id,
-                effect_def_id,
+                ability_id,
+                effect_id,
                 modifier_def,
                 target_id,
                 target_entity,
@@ -449,8 +516,8 @@ local function evaluate_effect(
         owner_id,
         owner_entity,
         owner_module,
-        ability_def_id,
-        effect_def_id,
+        ability_id,
+        effect_id,
         table.unpack(evaluate_args, 1, evaluate_args.n)
     )
 end
@@ -462,7 +529,7 @@ end
 ---@param evaluate_args table
 ---@return table
 local function collect_active_abilities(context, debug, evaluate_args)
-    local active_abilities = acquire_table()
+    local active_abilities = acquire_active_abilities()
     local defs = context.defs
     local world_module = context.world_module
 
@@ -525,8 +592,8 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
     local world_module = context.world_module
 
     for target_id, target_entity, target_module in world_module.entities(context) do
-        local tags = acquire_table()
-        local attributes = acquire_table()
+        local tags = acquire_tags()
+        local attributes = acquire_attrs()
 
         for i = 1, #active_abilities, 3 do
             local owner_id = active_abilities[i]
@@ -586,32 +653,32 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
             end
             release_table(attr_entry)
         end
-        release_table(attributes)
+        release_attrs(attributes)
 
         apply(context, target_entity, tags, deltas, table.unpack(evaluate_args, 1, evaluate_args.n))
 
-        release_table(tags)
+        release_tags(tags)
         release_table(deltas)
     end
 end
 
 --- 阶段三：回收对象池
 ---@param active_abilities table
-local function release_active_abilities(active_abilities)
+local function release_active_abilities_list(active_abilities)
     for i = 3, #active_abilities, 3 do
         release_table(active_abilities[i])
     end
-    release_table(active_abilities)
+    release_active_abilities(active_abilities)
 end
 
 --- 世界快照求值入口
---- 遍历所有实体的被动能力，按标签约束筛选目标，聚合属性修改后通过 ApplyFun 应用
+--- IDebug 从 context.debug 获取
 ---@param context mini_gas.IContext
----@param debug? mini_gas.IDebug
 ---@param apply mini_gas.ApplyFun
 ---@param ... unknown
-function ASC.evaluate(context, debug, apply, ...)
-    local evaluate_args = acquire_table()
+function ASC.evaluate(context, apply, ...)
+    local debug = context.debug
+    local evaluate_args = acquire_evaluate_args()
     local n = select("#", ...)
     for i = 1, n do
         evaluate_args[i] = select(i, ...)
@@ -620,11 +687,11 @@ function ASC.evaluate(context, debug, apply, ...)
 
     local active_abilities = collect_active_abilities(context, debug, evaluate_args)
     apply_to_targets(context, debug, apply, active_abilities, evaluate_args)
-    release_active_abilities(active_abilities)
+    release_active_abilities_list(active_abilities)
 
     call_step(debug, context, "evaluate_end")
 
-    release_table(evaluate_args)
+    release_evaluate_args(evaluate_args)
 end
 
 return ASC

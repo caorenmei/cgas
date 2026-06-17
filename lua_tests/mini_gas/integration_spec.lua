@@ -192,7 +192,7 @@ describe("mini_gas v2 integration", function()
             world_module = world_module,
             defs = defs,
         }
-        mini_gas.evaluate(context, nil, apply)
+        mini_gas.evaluate(context, apply)
 
         local function final_attr(entity, attr_id)
             return modules[entity].get_attribute(world_state.entities[entity], attr_id) + (results[world_state.entities[entity]] and results[world_state.entities[entity]][attr_id] or 0)

@@ -49,7 +49,7 @@ attributes[id] = final - base
 
 ### 6.6 求值流程
 
-`ASC.evaluate(context, debug, apply, ...)` 采用两阶段流程：
+`ASC.evaluate(context, apply, ...)` 采用两阶段流程，`IDebug` 通过 `context.debug` 传入：
 
 1. **收集阶段**：遍历世界所有实体作为 `owner`，再遍历每个 Ability；激活的能力以 `[owner_id, ability_id, modifier_args]` 三元组形式存入 `active_abilities`。
 2. **应用阶段**：再次遍历世界每个 `target` 实体，遍历 `active_abilities`，将可作用的 `grant_tags` 与 Modifier 结果聚合到该实体的 `tags` / `attributes` 中，最后调用一次 `ApplyFun`。
