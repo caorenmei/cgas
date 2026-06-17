@@ -12,7 +12,7 @@ MiniGas V2 是 MiniGas 的第二个版本，是一次完全重构。
 
 **设计目标**：
 - 在服务器端以快照方式对世界状态进行全量求值，计算实体之间的相互作用。
-- 通过接口化设计（`IEntityModule`、`IWorldModule`、`IEvaluation`）方便与现有系统集成，不强制使用框架内置的状态结构。
+- 通过接口化设计（`IEntityModule`、`IWorldModule`、`IDebug` / `ApplyFun`）方便与现有系统集成，不强制使用框架内置的状态结构。
 - 仅保留 Passive Ability，无主动技能、冷却、消耗、Tick 推进等复杂机制，保持核心最小化。
 
 **适用场景**：
@@ -57,7 +57,7 @@ local EFFECT_SWORD = "effect.sword"
 -- 1. 定义配置
 local defs = {
     attribute_defs = {
-        [ATTR_ATTACK] = { id = ATTR_ATTACK, default = 100 },
+        [ATTR_ATTACK] = { id = ATTR_ATTACK },
     },
     effect_defs = {
         [EFFECT_SWORD] = {
@@ -96,33 +96,37 @@ local entity_module = {
 }
 local world = { entities = { hero = entity } }
 local world_module = {
-    entities = function(_, w)
+    entities = function(_)
         return function(entities, id)
             local next_id, next_state = next(entities, id)
             if next_id == nil then return nil end
             return next_id, next_state, entity_module
-        end, w.entities
+        end, world.entities
     end,
-    entities_size = function(_, w) local n = 0 for _ in pairs(w.entities) do n = n + 1 end return n end,
-    has_entity = function(_, w, id) return w.entities[id] ~= nil end,
-    get_entity = function(_, w, id) return w.entities[id], entity_module end,
+    entities_size = function(_) local n = 0 for _ in pairs(world.entities) do n = n + 1 end return n end,
+    has_entity = function(_, id) return world.entities[id] ~= nil end,
+    get_entity = function(_, id) return world.entities[id], entity_module end,
 }
 
--- 3. 实现 IEvaluation
+-- 3. 实现 ApplyFun
 local deltas = {}
-local evaluation = {
-    apply = function(_, _, _, _, _, _, _, tags, attr_changes)
-        for _, entry in ipairs(attr_changes) do
-            deltas[entry.attr_id] = (deltas[entry.attr_id] or 0) + entry.value
-        end
-    end,
-}
+local function apply(_, entity, _, attributes)
+    deltas[entity] = deltas[entity] or {}
+    for attr_id, value in pairs(attributes) do
+        deltas[entity][attr_id] = (deltas[entity][attr_id] or 0) + value
+    end
+end
 
--- 4. 执行快照求值
-mini_gas.evaluate({}, world, world_module, defs, evaluation)
+-- 4. 组装 context 并执行快照求值
+local context = {
+    world = world,
+    world_module = world_module,
+    defs = defs,
+}
+mini_gas.evaluate(context, nil, apply)
 
 -- 最终 attack = 100 + 50 = 150
-print(entity_module.get_attribute(entity, ATTR_ATTACK) + (deltas[ATTR_ATTACK] or 0))
+print(entity_module.get_attribute(entity, ATTR_ATTACK) + (deltas[entity][ATTR_ATTACK] or 0))
 ```
 
 ---

@@ -61,15 +61,13 @@ function mini_gas.match_tags(entity, module, allof_tags, anyof_tags, noneof_tags
 ```lua
 ---世界快照求值入口
 ---@param context mini_gas.IContext
----@param world mini_gas.IWorldState
----@param world_module mini_gas.IWorldModule
----@param defs mini_gas.Defs
----@param evaluation mini_gas.IEvaluation
+---@param debug? mini_gas.IDebug
+---@param apply mini_gas.ApplyFun
 ---@param ... unknown
-function mini_gas.evaluate(context, world, world_module, defs, evaluation, ...) end
+function mini_gas.evaluate(context, debug, apply, ...) end
 ```
 
-`IEvaluation.apply` 在每个能力实体（owner）处理完毕后调用一次，传递该 owner 产生的所有授予标签集合（`table<mini_gas.Tag, boolean>`）与属性变化数组。`tags` 与 `attr_changes` 归库所有，`apply` 返回后会被回收。可选的 `begin_* / end_*` 回调用于日志或副作用。
+`ApplyFun` 在每个 `target` 实体全部求值完成后调用一次，传递该实体获得的所有授予标签集合（`table<mini_gas.Tag, boolean>`）与属性变化映射。`tags` 与 `attributes` 归库所有，`apply` 返回后会被回收。可选的 `IDebug` 回调用于日志或副作用。
 
 ---
 

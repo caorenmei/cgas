@@ -51,7 +51,7 @@ end
 
 local function make_world_module(world, modules)
     return {
-        entities = function(_, _)
+        entities = function(_)
             return function(entities, id)
                 local next_id, next_state = next(entities, id)
                 if next_id == nil then return nil end
@@ -63,8 +63,8 @@ local function make_world_module(world, modules)
             for _ in pairs(world.entities) do n = n + 1 end
             return n
         end,
-        has_entity = function(_, _, id) return world.entities[id] ~= nil end,
-        get_entity = function(_, _, id) return world.entities[id], modules[id] end,
+        has_entity = function(_, id) return world.entities[id] ~= nil end,
+        get_entity = function(_, id) return world.entities[id], modules[id] end,
     }
 end
 
@@ -72,8 +72,8 @@ describe("mini_gas v2 integration", function()
     it("full example from v2 spec", function()
         local defs = {
             attribute_defs = {
-                [ATTR_ATTACK] = { id = ATTR_ATTACK, default = 100 },
-                [ATTR_GOLD] = { id = ATTR_GOLD, default = 0 },
+                [ATTR_ATTACK] = { id = ATTR_ATTACK },
+                [ATTR_GOLD] = { id = ATTR_GOLD },
             },
             effect_defs = {
                 [EFFECT_SWORD] = {
@@ -92,7 +92,7 @@ describe("mini_gas v2 integration", function()
                     id = EFFECT_BUILDING,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _, _, _, extra)
+                            attribute = function(_, _, _, _, _, extra)
                                 local world_level = extra and extra.world_level or 1
                                 return ATTR_GOLD, 100 * world_level
                             end,
@@ -113,25 +113,22 @@ describe("mini_gas v2 integration", function()
                     id = ABILITY_SWORD,
                     activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_SWORD },
-                    can_activate = function() return true end,
                 },
                 [ABILITY_VIP] = {
                     id = ABILITY_VIP,
                     activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_VIP },
-                    can_activate = function() return true end,
                 },
                 [ABILITY_PET] = {
                     id = ABILITY_PET,
                     activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_PET },
-                    can_activate = function() return true end,
                 },
                 [ABILITY_BUILDING] = {
                     id = ABILITY_BUILDING,
                     activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_BUILDING },
-                    can_activate = function(_, _, _, _, _, _, _)
+                    can_activate = function(_, _, _)
                         return true, { world_level = 3 }
                     end,
                 },
@@ -178,22 +175,24 @@ describe("mini_gas v2 integration", function()
         local world_module = make_world_module(world_state, modules)
 
         local results = {}
-        local owner_tags = {}
-        local evaluation = {
-            apply = function(_, _, _, _, owner_id, _, _, tags, attr_changes)
-                local copied = {}
-                for tag in pairs(tags) do
-                    copied[tag] = true
-                end
-                owner_tags[owner_id] = copied
-                for _, entry in ipairs(attr_changes) do
-                    results[entry.entity] = results[entry.entity] or {}
-                    results[entry.entity][entry.attr_id] = (results[entry.entity][entry.attr_id] or 0) + entry.value
-                end
-            end,
-        }
+        local entity_tags = {}
+        local function apply(_, entity, tags, attributes)
+            entity_tags[entity] = {}
+            for tag in pairs(tags) do
+                entity_tags[entity][tag] = true
+            end
+            results[entity] = results[entity] or {}
+            for attr_id, value in pairs(attributes) do
+                results[entity][attr_id] = (results[entity][attr_id] or 0) + value
+            end
+        end
 
-        mini_gas.evaluate({}, world_state, world_module, defs, evaluation)
+        local context = {
+            world = world_state,
+            world_module = world_module,
+            defs = defs,
+        }
+        mini_gas.evaluate(context, nil, apply)
 
         local function final_attr(entity, attr_id)
             return modules[entity].get_attribute(world_state.entities[entity], attr_id) + (results[world_state.entities[entity]] and results[world_state.entities[entity]][attr_id] or 0)
@@ -204,6 +203,7 @@ describe("mini_gas v2 integration", function()
         assert.near(120, final_attr("commander", ATTR_ATTACK), 0.0001)
         assert.near(120, final_attr("ally", ATTR_ATTACK), 0.0001)
 
-        assert.is_true(owner_tags["commander"][TAG_AURA])
+        assert.is_true(entity_tags[commander_state][TAG_AURA])
+        assert.is_true(entity_tags[ally_state][TAG_AURA])
     end)
 end)

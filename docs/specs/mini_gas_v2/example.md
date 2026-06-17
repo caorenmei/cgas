@@ -1,7 +1,12 @@
+# MiniGas V2 示例
 
-## 12. 使用示例
+本文档是 [v2.md](v2.md) 的配套完整示例。
 
-### 12.1 装备、VIP、宠物、建筑与光环的综合计算
+## 示例
+
+以下示例展示一次完整的求值过程。示例中的状态实现采用最简单的 Lua 表，业务方可根据实际需求替换为数据库、ECS 组件或网络同步状态。
+
+### 装备、VIP、宠物、建筑与光环的综合计算
 
 场景：
 - 英雄佩戴传说之剑（被动技能），基础攻击 +50。
@@ -11,12 +16,7 @@
 - 指挥官拥有攻击光环（被动技能），当世界中存在至少 2 名指挥官时激活；该光环会给所有指挥官（包括自身）添加 `buff.commander_aura` 标签，并使攻击 ×1.2；这里使用 `AbilityActivateCondition` 对象形式并设置 `include_self = true`，同时使用 `EEffectTarget.All` 实现跨实体效果。
 
 ```lua
-local mini_gas = require("mini_gas")
-local EModifierOp = mini_gas.EModifierOp
-local EAbilityActivationPolicy = mini_gas.EAbilityActivationPolicy
-local EEffectTarget = mini_gas.EEffectTarget
-
--- 业务级 ID 与标签
+-- 业务级 ID 与标签（业务方可用 @enum 管理）
 local ATTR_ATTACK = "attr.attack"
 local ATTR_GOLD   = "attr.gold"
 
@@ -67,6 +67,7 @@ local defs = {
             modifiers = {
                 {
                     -- 当 can_activate 为函数形式时，modifier_args 即为该函数返回的 ...
+                    -- 首次调用时 id、value 为 nil；若返回第三个函数，则递归调用并传入本次返回的 (id, value)
                     attribute = function(context, entity, def, id, value, extra)
                         local world_level = extra and extra.world_level or 1
                         return ATTR_GOLD, 100 * world_level
@@ -227,7 +228,7 @@ local debug = {
 
 -- 最终应用函数：每个实体在全部求值完成后调用一次
 -- tags 为 { [tag] = true }，attributes 为 { [attr_id] = delta }
-local function apply(context, entity, tags, attributes)
+local function apply(context, entity, tags, attributes, ...)
     granted_tags[entity] = granted_tags[entity] or {}
     for tag, _ in pairs(tags) do
         local list = granted_tags[entity]
@@ -241,7 +242,7 @@ local function apply(context, entity, tags, attributes)
 end
 
 -- 这里不需要再传入 world_level，因为建筑 Ability 的 can_activate 已经返回了该上下文
-mini_gas.evaluate(context, debug, apply)
+ASC.evaluate(context, debug, apply)
 
 -- 5. 查看结果
 local function final_attr(entity, attr_id)
@@ -260,7 +261,3 @@ print(final_attr(ally_state, ATTR_ATTACK))      -- 120
 ```
 
 > 以上示例完整演示了：`ApplyFun` 每个实体在全部求值完成后只调用一次，接收 `context`、`entity`、`tags`、`attributes`，其中 `tags` 为 `{ [tag] = true }` 集合，`attributes` 为属性 ID 到 add 语义差值（`new_value - old_value`）的映射；业务方通过“旧值 + 差值”得到最终值。Modifier 聚合规则为：Add 累加、Multiply 连乘（无 Multiply 时视为乘以 1）、Override 按遍历顺序取最后一个值；存在 Override 时最终值为 Override 值，否则为 `(base + add_sum) * multiply_product`。来源追踪等调试需求可通过 `IDebug` 钩子完成。`can_activate` 为空时 Ability 默认激活；`AbilityActivateConditionFunc` 通过返回值向 `ModifierAttributeEval` 传递上下文；`AbilityActivateCondition` 对象形式通过 `requires_count = 2` 与 `include_self = true` 实现“世界中至少存在 2 名指挥官”的激活条件；`EffectDef` 的 `allof_tags` 在 `EEffectTarget.All` 下完成了对所有指挥官的跨实体筛选；`IEntityModule` 与 `IWorldModule` 的迭代器均使用 `return next, state` 形式避免 Lua 迭代器陷阱。
-
----
-
-> [返回 Mini-GAS 设计文档总览](./README.md)

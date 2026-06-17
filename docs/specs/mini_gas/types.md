@@ -8,7 +8,9 @@
 ```lua
 ---@alias mini_gas.ID integer | string
 ---@alias mini_gas.Tag string
----@alias mini_gas.Iterator fun(state: any, key?: any): any, any
+---@alias mini_gas.Iterator<P1> fun(state: any, key?: any): P1
+---@alias mini_gas.Iterator2<P1, P2> fun(state: any, key?: any): P1, P2
+---@alias mini_gas.Iterator3<P1, P2, P3> fun(state: any, key?: any): P1, P2, P3
 ```
 
 ### 5.2 枚举
@@ -41,7 +43,6 @@ local EEffectTarget = {
 ---@field id mini_gas.ID
 ---@field min? number
 ---@field max? number
----@field default? number
 
 ---@class mini_gas.Defs
 ---@field attribute_defs table<mini_gas.ID, mini_gas.AttributeDef>
@@ -49,35 +50,38 @@ local EEffectTarget = {
 ---@field ability_defs table<mini_gas.ID, mini_gas.AbilityDef>
 ```
 
-### 5.4 回调数据
-
-`IEvaluation.apply` 接收的 `tags` 为当前 owner 授予的所有标签集合，`table<mini_gas.Tag, boolean>` 形式；`attr_changes` 为属性变化数组。
+### 5.4 系统上下文
 
 ```lua
----@class mini_gas.AttrChangeEntry
----@field entity mini_gas.IEntityState
----@field module mini_gas.IEntityModule
----@field attr_id mini_gas.ID
----@field value number
+---@class mini_gas.IContext
+---@field world mini_gas.IWorldState
+---@field world_module mini_gas.IWorldModule
+---@field defs mini_gas.Defs
 ```
 
-### 5.5 IEvaluation
+### 5.5 IDebug
 
 ```lua
----@class mini_gas.IEvaluation
----@field begin_ability? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
----@field end_ability? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
----@field begin_effect? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
----@field end_effect? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
----@field begin_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
----@field end_modifier? fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
----@field apply fun(context: mini_gas.IContext, world: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, defs: mini_gas.Defs, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, tags: table<mini_gas.Tag, boolean>, attr_changes: mini_gas.AttrChangeEntry[], ...: unknown)
+---@class mini_gas.IDebug
+---@field begin_ability? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
+---@field end_ability? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, ...: unknown)
+---@field begin_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
+---@field end_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, ...: unknown)
+---@field begin_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field end_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_def_id: mini_gas.ID, effect_def_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
+---@field step? fun(context: mini_gas.IContext, phase: string, ...: unknown)
 ```
 
-### 5.6 ModifierDef
+### 5.6 ApplyFun
 
 ```lua
----@alias mini_gas.ModifierAttributeEval fun(context:mini_gas.IContext, world_state: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, entity: mini_gas.IEntityState, entity_module: mini_gas.IEntityModule, def: mini_gas.ModifierDef, id?: mini_gas.ID, value?: number, ...: unknown): mini_gas.ID, number, mini_gas.ModifierAttributeEval?
+---@alias mini_gas.ApplyFun fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, tags: table<mini_gas.Tag, boolean>, attributes: table<mini_gas.ID, number>, ...: unknown)
+```
+
+### 5.7 ModifierDef
+
+```lua
+---@alias mini_gas.ModifierAttributeEval fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.ModifierDef, id?: mini_gas.ID, value?: number, ...: unknown): mini_gas.ID, number, mini_gas.ModifierAttributeEval?
 
 ---@class mini_gas.ModifierDef
 ---@field attribute [mini_gas.ID, number] | mini_gas.ModifierAttributeEval
@@ -87,7 +91,7 @@ local EEffectTarget = {
 ---@field noneof_tags? mini_gas.Tag[]
 ```
 
-### 5.7 EffectDef
+### 5.8 EffectDef
 
 ```lua
 ---@class mini_gas.EffectDef
@@ -100,7 +104,7 @@ local EEffectTarget = {
 ---@field target? mini_gas.EEffectTarget
 ```
 
-### 5.8 AbilityDef
+### 5.9 AbilityDef
 
 ```lua
 ---@class mini_gas.AbilityActivateCondition
@@ -110,7 +114,7 @@ local EEffectTarget = {
 ---@field requires_count integer
 ---@field include_self? boolean
 
----@alias mini_gas.AbilityActivateConditionFunc fun(context:mini_gas.IContext, defs: mini_gas.Defs, world_state: mini_gas.IWorldState, world_module: mini_gas.IWorldModule, entity: mini_gas.IEntityState, entity_module: mini_gas.IEntityModule, def: mini_gas.AbilityDef, ...: unknown): boolean, ...
+---@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, ...
 
 ---@class mini_gas.AbilityDef
 ---@field id mini_gas.ID

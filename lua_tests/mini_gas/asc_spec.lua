@@ -41,7 +41,7 @@ end
 ---@return mini_gas.IWorldModule
 local function make_world_module(world, modules)
     return {
-        entities = function(_, _)
+        entities = function(_)
             return function(entities, id)
                 local next_id, next_state = next(entities, id)
                 if next_id == nil then return nil end
@@ -53,22 +53,34 @@ local function make_world_module(world, modules)
             for _ in pairs(world.entities) do n = n + 1 end
             return n
         end,
-        has_entity = function(_, _, id) return world.entities[id] ~= nil end,
-        get_entity = function(_, _, id) return world.entities[id], modules[id] end,
+        has_entity = function(_, id) return world.entities[id] ~= nil end,
+        get_entity = function(_, id) return world.entities[id], modules[id] end,
     }
 end
 
---- 从 evaluation.apply 调用中累加属性变化
----@param deltas table<any, number>
----@return mini_gas.IEvaluation
-local function make_evaluation(deltas)
+--- 构造求值上下文
+---@param world table
+---@param world_module mini_gas.IWorldModule
+---@param defs table
+---@return mini_gas.IContext
+local function make_context(world, world_module, defs)
     return {
-        apply = function(_, _, _, _, _, _, _, _, attr_changes)
-            for _, entry in ipairs(attr_changes) do
-                deltas[entry.attr_id] = (deltas[entry.attr_id] or 0) + entry.value
-            end
-        end,
+        world = world,
+        world_module = world_module,
+        defs = defs,
     }
+end
+
+--- 从 apply 调用中累加属性变化
+---@param deltas table<any, number>
+---@return mini_gas.ApplyFun
+local function make_apply(deltas)
+    return function(_, entity, _, attributes)
+        deltas[entity] = deltas[entity] or {}
+        for attr_id, value in pairs(attributes) do
+            deltas[entity][attr_id] = (deltas[entity][attr_id] or 0) + value
+        end
+    end
 end
 
 describe("mini_gas v2 asc", function()
@@ -117,7 +129,7 @@ describe("mini_gas v2 asc", function()
         local world_module = make_world_module(world, modules)
 
         local defs = {
-            attribute_defs = { [ATTR_ATTACK] = { id = ATTR_ATTACK, default = 100 } },
+            attribute_defs = { [ATTR_ATTACK] = { id = ATTR_ATTACK } },
             effect_defs = {
                 [EFFECT_SWORD] = {
                     id = EFFECT_SWORD,
@@ -134,8 +146,9 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
-        assert.equal(50, deltas[ATTR_ATTACK])
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply(deltas))
+        assert.equal(50, deltas[entity][ATTR_ATTACK])
     end)
 
     it("evaluate filters modifiers by target tags", function()
@@ -169,8 +182,9 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
-        assert.equal(40, deltas[ATTR_ATTACK])
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply(deltas))
+        assert.equal(40, deltas[entity][ATTR_ATTACK])
     end)
 
     it("evaluate aggregates add and multiply modifiers from same effect", function()
@@ -210,8 +224,9 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
-        assert.near(120, deltas[ATTR_GOLD], 0.0001)
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply(deltas))
+        assert.near(120, deltas[entity][ATTR_GOLD], 0.0001)
     end)
 
     it("evaluate applies all-target cross-entity effects", function()
@@ -254,26 +269,25 @@ describe("mini_gas v2 asc", function()
             },
         }
 
-        local owner_tags = {}
+        local entity_tags = {}
         local deltas = {}
-        local evaluation = {
-            apply = function(_, _, _, _, owner_id, _, _, tags, attr_changes)
-                local copied = {}
-                for tag in pairs(tags) do
-                    copied[tag] = true
-                end
-                owner_tags[owner_id] = copied
-                for _, entry in ipairs(attr_changes) do
-                    deltas[entry.entity] = deltas[entry.entity] or {}
-                    deltas[entry.entity][entry.attr_id] = { value = entry.value }
-                end
-            end,
-        }
+        local function apply(_, entity, tags, attributes)
+            entity_tags[entity] = {}
+            for tag in pairs(tags) do
+                entity_tags[entity][tag] = true
+            end
+            deltas[entity] = deltas[entity] or {}
+            for attr_id, value in pairs(attributes) do
+                deltas[entity][attr_id] = (deltas[entity][attr_id] or 0) + value
+            end
+        end
 
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
-        assert.is_true(owner_tags["commander"][TAG_AURA])
-        assert.near(20, deltas[commander][ATTR_ATTACK].value, 0.0001)
-        assert.near(20, deltas[ally][ATTR_ATTACK].value, 0.0001)
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, apply)
+        assert.is_true(entity_tags[commander][TAG_AURA])
+        assert.is_true(entity_tags[ally][TAG_AURA])
+        assert.near(20, deltas[commander][ATTR_ATTACK], 0.0001)
+        assert.near(20, deltas[ally][ATTR_ATTACK], 0.0001)
     end)
 
     it("evaluate handles ability condition object with requires_count and include_self", function()
@@ -316,16 +330,15 @@ describe("mini_gas v2 asc", function()
         }
 
         local total_tag_count = 0
-        local evaluation = {
-            apply = function(_, _, _, _, _, _, _, tags)
-                for _ in pairs(tags) do
-                    total_tag_count = total_tag_count + 1
-                end
-            end,
-        }
+        local function apply(_, _, tags)
+            for _ in pairs(tags) do
+                total_tag_count = total_tag_count + 1
+            end
+        end
 
-        mini_gas.evaluate({}, world, world_module, defs, evaluation)
-        assert.equal(1, total_tag_count) -- a has the ability and activates; grants TAG_AURA once
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, apply)
+        assert.equal(2, total_tag_count) -- a and b each receive TAG_AURA once
     end)
 
     it("evaluate passes condition function extras to modifier functions", function()
@@ -345,7 +358,7 @@ describe("mini_gas v2 asc", function()
                     id = EFFECT_SWORD,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _, _, _, extra)
+                            attribute = function(_, _, _, _, _, extra)
                                 local level = extra and extra.level or 1
                                 return ATTR_GOLD, 100 * level
                             end,
@@ -359,7 +372,7 @@ describe("mini_gas v2 asc", function()
                     id = ABILITY_SWORD,
                     activation_policy = EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_SWORD },
-                    can_activate = function(_, _, _, _, _, _, _, _, _)
+                    can_activate = function(_, _, _)
                         return true, { level = 3 }
                     end,
                 },
@@ -367,8 +380,9 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
-        assert.equal(300, deltas[ATTR_GOLD])
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply(deltas))
+        assert.equal(300, deltas[entity][ATTR_GOLD])
     end)
 
     it("evaluate passes condition object count as first vararg to modifier functions", function()
@@ -395,7 +409,7 @@ describe("mini_gas v2 asc", function()
                     target = EEffectTarget.All,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _, _, _, count)
+                            attribute = function(_, _, _, _, _, count)
                                 received_count = count
                                 return ATTR_ATTACK, 1.1
                             end,
@@ -418,7 +432,8 @@ describe("mini_gas v2 asc", function()
             },
         }
 
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation({}))
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply({}))
         assert.equal(2, received_count)
     end)
 
@@ -450,8 +465,9 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
-        assert.equal(20, deltas[ATTR_ATTACK]) -- 100 + 50 clamped to 120, delta = 20
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply(deltas))
+        assert.equal(20, deltas[entity][ATTR_ATTACK]) -- 100 + 50 clamped to 120, delta = 20
     end)
 
     it("evaluate supports recursive modifier attribute functions", function()
@@ -472,10 +488,10 @@ describe("mini_gas v2 asc", function()
                     id = EFFECT_SWORD,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, _, _, _, _)
+                            attribute = function(_, _, _, _, _, _)
                                 step = step + 1
                                 if step == 1 then
-                                    return ATTR_ATTACK, 10, function(_, _, _, _, _, _, _, _, _)
+                                    return ATTR_ATTACK, 10, function(_, _, _, _, _, _)
                                         step = step + 1
                                         return ATTR_GOLD, 5, nil
                                     end
@@ -497,9 +513,10 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
-        assert.equal(10, deltas[ATTR_ATTACK])
-        assert.equal(5, deltas[ATTR_GOLD])
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply(deltas))
+        assert.equal(10, deltas[entity][ATTR_ATTACK])
+        assert.equal(5, deltas[entity][ATTR_GOLD])
     end)
 
     it("evaluate supports override operation", function()
@@ -533,7 +550,75 @@ describe("mini_gas v2 asc", function()
         }
 
         local deltas = {}
-        mini_gas.evaluate({}, world, world_module, defs, make_evaluation(deltas))
-        assert.equal(200, deltas[ATTR_ATTACK]) -- override 300 - base 100 = 200
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, nil, make_apply(deltas))
+        assert.equal(200, deltas[entity][ATTR_ATTACK]) -- override 300 - base 100 = 200
+    end)
+
+    it("evaluate invokes debug hooks", function()
+        local entity = {
+            attrs = { [ATTR_ATTACK] = 100 },
+            static_tags = {},
+            static_abilities = { [ABILITY_SWORD] = true },
+        }
+        local modules = { hero = make_entity_module(entity) }
+        local world = { entities = { hero = entity } }
+        local world_module = make_world_module(world, modules)
+
+        local defs = {
+            attribute_defs = {},
+            effect_defs = {
+                [EFFECT_SWORD] = {
+                    id = EFFECT_SWORD,
+                    modifiers = { { attribute = { ATTR_ATTACK, 50 }, op = EModifierOp.Add } },
+                },
+            },
+            ability_defs = {
+                [ABILITY_SWORD] = {
+                    id = ABILITY_SWORD,
+                    activation_policy = EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_SWORD },
+                },
+            },
+        }
+
+        local events = {}
+        local debug = {
+            begin_ability = function(_, owner_id)
+                table.insert(events, { "begin_ability", owner_id })
+            end,
+            end_ability = function(_, owner_id)
+                table.insert(events, { "end_ability", owner_id })
+            end,
+            begin_effect = function(_, owner_id, _, _, _, effect_def_id)
+                table.insert(events, { "begin_effect", owner_id, effect_def_id })
+            end,
+            end_effect = function(_, owner_id, _, _, _, effect_def_id)
+                table.insert(events, { "end_effect", owner_id, effect_def_id })
+            end,
+            begin_modifier = function(_, owner_id, _, _, _, _, _, _, target_entity)
+                table.insert(events, { "begin_modifier", owner_id, target_entity })
+            end,
+            end_modifier = function(_, owner_id, _, _, _, _, _, _, target_entity)
+                table.insert(events, { "end_modifier", owner_id, target_entity })
+            end,
+            step = function(_, phase)
+                table.insert(events, { "step", phase })
+            end,
+        }
+
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, debug, function() end)
+
+        assert.equal("step", events[1][1])
+        assert.equal("evaluate_start", events[1][2])
+        assert.equal("begin_ability", events[2][1])
+        assert.equal("end_ability", events[3][1])
+        assert.equal("begin_effect", events[4][1])
+        assert.equal("begin_modifier", events[5][1])
+        assert.equal("end_modifier", events[6][1])
+        assert.equal("end_effect", events[7][1])
+        assert.equal("step", events[8][1])
+        assert.equal("evaluate_end", events[8][2])
     end)
 end)
