@@ -45,7 +45,7 @@ function M.check_can_activate(context, owner_entity, ability_def, evaluate_args)
     if type(can_activate) == "table" then
         local count = count_matching_entities(context, can_activate, ability_def.id)
         local active = count >= (can_activate.requires_count or 1)
-        local modifier_args = pool.acquire_array()
+        local modifier_args = pool.acquire_short_array()
         modifier_args[1] = count
         for i = 1, evaluate_args.n do
             modifier_args[i + 1] = evaluate_args[i]
@@ -58,12 +58,11 @@ function M.check_can_activate(context, owner_entity, ability_def, evaluate_args)
     if type(can_activate) == "function" then
         local packed = table.pack(can_activate(context, owner_entity, ability_def, table.unpack(evaluate_args, 1, evaluate_args.n)))
         local active = packed[1] == true
-        local results = pool.acquire_array()
+        local results = pool.acquire_short_array()
         for i = 2, packed.n do
             results[i - 1] = packed[i]
         end
         results.n = packed.n - 1
-        pool.release_array(packed)
         return active, results, true
     end
 
@@ -77,7 +76,7 @@ end
 ---@param evaluate_args table
 ---@return table
 function M.collect_active_abilities(context, debug, evaluate_args)
-    local active_abilities = pool.acquire_array()
+    local active_abilities = pool.acquire_long_array()
     local defs = context.defs
     local world_module = context.world_module
 
@@ -112,7 +111,7 @@ function M.collect_active_abilities(context, debug, evaluate_args)
                 idx = idx + 1
                 active_abilities[idx] = modifier_args
             elseif need_release then
-                pool.release_array(modifier_args)
+                pool.release_short_array(modifier_args)
             end
 
             debug_helper.call_debug(
@@ -138,9 +137,9 @@ end
 ---@param active_abilities table
 function M.release_active_abilities(active_abilities)
     for i = 3, active_abilities.n, 3 do
-        pool.release_array(active_abilities[i])
+        pool.release_short_array(active_abilities[i])
     end
-    pool.release_array(active_abilities)
+    pool.release_long_array(active_abilities)
 end
 
 return M

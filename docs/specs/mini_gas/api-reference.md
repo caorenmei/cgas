@@ -85,7 +85,7 @@ function mini_gas.evaluate(context, apply, ...) end
 | `mini_gas.ability` | Ability 激活条件与收集 |
 | `mini_gas.effect` | Effect 目标匹配与应用 |
 | `mini_gas.modifier` | Modifier 解析与聚合 |
-| `mini_gas.pool` | 两类对象池：`table_pool`（键值表）与 `array_pool`（纯数组表） |
+| `mini_gas.pool` | 三类对象池：`table_pool`（键值表）、`short_array_pool`（短数组表）与 `long_array_pool`（长数组表） |
 | `mini_gas.debug` | 调试钩子辅助函数 |
 
 ---

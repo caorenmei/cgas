@@ -88,16 +88,17 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
         end
 
         -- 将聚合结果转换为 add 语义差值
+        -- attr_entry 使用数组结构：[1] override, [2] add, [3] multiply
         local deltas = pool.acquire_table()
         for attr_id, attr_entry in pairs(attributes) do
             local base = target_module.get_attribute(target_entity, attr_id)
-            local final = attr_entry.override ~= nil and attr_entry.override or (base + attr_entry.add) * attr_entry.multiply
+            local final = attr_entry[1] ~= nil and attr_entry[1] or (base + attr_entry[2]) * attr_entry[3]
             local attr_def = defs.attribute_defs[attr_id]
             if attr_def then
                 final = clamp(final, attr_def.min, attr_def.max)
             end
             local delta = final - base
-            if delta ~= 0 or attr_entry.override ~= nil then
+            if delta ~= 0 or attr_entry[1] ~= nil then
                 deltas[attr_id] = delta
             end
             pool.release_table(attr_entry)
@@ -118,7 +119,7 @@ end
 ---@param ... unknown
 function ASC.evaluate(context, apply, ...)
     local debug = context.debug
-    local evaluate_args = pool.acquire_array()
+    local evaluate_args = pool.acquire_short_array()
     local n = select("#", ...)
     for i = 1, n do
         evaluate_args[i] = select(i, ...)
@@ -131,7 +132,7 @@ function ASC.evaluate(context, apply, ...)
 
     debug_helper.call_step(debug, context, "evaluate_end")
 
-    pool.release_array(evaluate_args)
+    pool.release_short_array(evaluate_args)
 end
 
 return ASC

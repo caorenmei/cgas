@@ -27,8 +27,8 @@
 
 ```
 base = IEntityModule.get_attribute(entity, id)
-if override ~= nil then final = override
-else final = (base + add_sum) * multiply_product end
+if attr_entry[1] ~= nil then final = attr_entry[1]
+else final = (base + attr_entry[2]) * attr_entry[3] end
 final = clamp(final, min, max)
 attributes[id] = final - base
 ```
