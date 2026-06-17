@@ -15,6 +15,9 @@ ASC.match_tag = tag.match_tag
 ASC.entity_match_tag = tag.entity_match_tag
 ASC.match_tags = tag.match_tags
 
+--- 空 effects 数组占位，避免 ability_def.effects 为 nil 时每次求值都创建临时空表
+local EMPTY_EFFECTS = {}
+
 --- 数值截断
 ---@param value number
 ---@param min? number
@@ -56,7 +59,7 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
 
             local owner_entity, owner_module = world_module.get_entity(context, owner_id)
 
-            for _, effect_id in ipairs(ability_def.effects or {}) do
+            for _, effect_id in ipairs(ability_def.effects or EMPTY_EFFECTS) do
                 local effect_def = defs.effect_defs[effect_id]
                 if not effect_def then
                     debug_helper.call_step(debug, context, "missing_effect", owner_id, ability_id, effect_id)
