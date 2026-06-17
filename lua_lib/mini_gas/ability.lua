@@ -24,6 +24,19 @@ local function count_matching_entities(context, condition, owner_id)
     return count
 end
 
+--- 将可变参数打包到短数组池的表中，替代 table.pack 以避免临时表分配
+---@param ... unknown
+---@return table
+local function pack_results(...)
+    local t = pool.acquire_short_array()
+    local n = select("#", ...)
+    for i = 1, n do
+        t[i] = select(i, ...)
+    end
+    t.n = n
+    return t
+end
+
 --- 评估 Ability 激活条件，返回是否激活以及 modifier_args
 --- modifier_args 需要调用方负责回收（当 need_release 为 true 时）
 ---@param context mini_gas.IContext
@@ -56,13 +69,14 @@ function M.check_can_activate(context, owner_entity, ability_def, evaluate_args)
 
     -- 函数形式：返回 boolean, ...，打包 ... 作为 modifier_args
     if type(can_activate) == "function" then
-        local packed = table.pack(can_activate(context, owner_entity, ability_def, table.unpack(evaluate_args, 1, evaluate_args.n)))
+        local packed = pack_results(can_activate(context, owner_entity, ability_def, table.unpack(evaluate_args, 1, evaluate_args.n)))
         local active = packed[1] == true
         local results = pool.acquire_short_array()
         for i = 2, packed.n do
             results[i - 1] = packed[i]
         end
         results.n = packed.n - 1
+        pool.release_short_array(packed)
         return active, results, true
     end
 
