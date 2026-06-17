@@ -41,10 +41,10 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
     local world_module = context.world_module
 
     for target_id, target_entity, target_module in world_module.entities(context) do
-        local tags = pool.acquire_tags()
-        local attributes = pool.acquire_attrs()
+        local tags = pool.acquire_table()
+        local attributes = pool.acquire_table()
 
-        for i = 1, #active_abilities, 3 do
+        for i = 1, active_abilities.n, 3 do
             local owner_id = active_abilities[i]
             local ability_id = active_abilities[i + 1]
             local modifier_args = active_abilities[i + 2]
@@ -102,11 +102,11 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
             end
             pool.release_table(attr_entry)
         end
-        pool.release_attrs(attributes)
+        pool.release_table(attributes)
 
         apply(context, target_entity, tags, deltas, table.unpack(evaluate_args, 1, evaluate_args.n))
 
-        pool.release_tags(tags)
+        pool.release_table(tags)
         pool.release_table(deltas)
     end
 end
@@ -118,7 +118,7 @@ end
 ---@param ... unknown
 function ASC.evaluate(context, apply, ...)
     local debug = context.debug
-    local evaluate_args = pool.acquire_evaluate_args()
+    local evaluate_args = pool.acquire_array()
     local n = select("#", ...)
     for i = 1, n do
         evaluate_args[i] = select(i, ...)
@@ -131,7 +131,7 @@ function ASC.evaluate(context, apply, ...)
 
     debug_helper.call_step(debug, context, "evaluate_end")
 
-    pool.release_evaluate_args(evaluate_args)
+    pool.release_array(evaluate_args)
 end
 
 return ASC

@@ -15,15 +15,18 @@ local M = {}
 ---@param modifier_args table
 ---@return table
 function M.resolve_modifier_attribute(context, entity, modifier_def, modifier_args)
-    local result = pool.acquire_table()
+    local result = pool.acquire_array()
     local attr = modifier_def.attribute
+    local count = 0
 
     if type(attr) == "table" then
         local id, value = attr[1], attr[2]
         if id ~= nil and value ~= nil then
-            local entry = pool.acquire_table()
+            local entry = pool.acquire_array()
             entry[1], entry[2] = id, value
-            result[#result + 1] = entry
+            entry.n = 2
+            count = count + 1
+            result[count] = entry
         end
     elseif type(attr) == "function" then
         local id, value = nil, nil
@@ -31,15 +34,18 @@ function M.resolve_modifier_attribute(context, entity, modifier_def, modifier_ar
         while type(next_eval) == "function" do
             id, value, next_eval = next_eval(context, entity, modifier_def, id, value, table.unpack(modifier_args, 1, modifier_args.n))
             if id ~= nil and value ~= nil then
-                local entry = pool.acquire_table()
+                local entry = pool.acquire_array()
                 entry[1], entry[2] = id, value
-                result[#result + 1] = entry
+                entry.n = 2
+                count = count + 1
+                result[count] = entry
             end
         end
     else
         result.invalid = true
     end
 
+    result.n = count
     return result
 end
 
@@ -98,7 +104,8 @@ function M.evaluate_modifier(
         debug_helper.call_step(debug, context, "invalid_modifier_attribute", owner_id, ability_id, effect_id, modifier_def, target_id)
     end
 
-    for _, pair in ipairs(pairs_list) do
+    for i = 1, pairs_list.n do
+        local pair = pairs_list[i]
         local attr_id, value = pair[1], pair[2]
         local attr_entry = attributes[attr_id]
         if not attr_entry then
@@ -118,11 +125,11 @@ function M.evaluate_modifier(
         end
     end
 
-    for i = 1, #pairs_list do
-        pool.release_table(pairs_list[i])
+    for i = 1, pairs_list.n do
+        pool.release_array(pairs_list[i])
     end
     pairs_list.invalid = nil
-    pool.release_table(pairs_list)
+    pool.release_array(pairs_list)
 
     debug_helper.call_debug(
         debug,

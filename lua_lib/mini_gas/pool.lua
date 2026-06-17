@@ -1,18 +1,17 @@
 --- MiniGas V2 内部对象池
---- 分类复用 evaluate 过程中的临时表，降低 GC 压力
+--- 仅保留两种池：
+---   - table_pool：复用键值型临时表，回收时遍历 pairs 清空
+---   - array_pool：复用纯数组型临时表，回收时按 t.n 逐个置 false
 
 local M = {}
 
---- 通用表对象池，用于复用 evaluate 内部的小型临时表
+--- 键值型表对象池
 local table_pool = {}
 
---- 分类对象池
-local tags_pool = {}
-local attrs_pool = {}
-local evaluate_args_pool = {}
-local active_abilities_pool = {}
+--- 数组型表对象池
+local array_pool = {}
 
---- 从指定对象池获取一张已清空的表
+--- 从对象池获取一张已清空的表
 ---@param pool table
 ---@return table
 local function acquire_from(pool)
@@ -28,10 +27,16 @@ local function acquire_from(pool)
     return t
 end
 
---- 将表清空并归还指定对象池，带有重复释放保护
----@param pool table
+--- 从 table_pool 获取一张已清空的表
+---@return table
+function M.acquire_table()
+    return acquire_from(table_pool)
+end
+
+--- 归还 table_pool
+--- 使用 pairs 遍历，将所有键值置 nil
 ---@param t table
-local function release_to(pool, t)
+function M.release_table(t)
     if not t or t.__in_pool then
         return
     end
@@ -39,67 +44,40 @@ local function release_to(pool, t)
         t[k] = nil
     end
     t.__in_pool = true
-    table.insert(pool, t)
+    table.insert(table_pool, t)
 end
 
---- 从通用对象池获取一张已清空的表
+--- 从 array_pool 获取一张已清空的数组表
 ---@return table
-function M.acquire_table()
-    return acquire_from(table_pool)
+function M.acquire_array()
+    local t = table.remove(array_pool)
+    if t then
+        t.__in_pool = nil
+        local n = t.n or 0
+        for i = 1, n do
+            t[i] = false
+        end
+        t.n = 0
+    else
+        t = { n = 0 }
+    end
+    return t
 end
 
---- 将表清空并归还通用对象池
+--- 归还 array_pool
+--- 按 t.n 将数组元素置 false，并将 t.n 设为 0
 ---@param t table
-function M.release_table(t)
-    release_to(table_pool, t)
-end
-
---- 从 tags 对象池获取一张已清空的表
----@return table<mini_gas.Tag, boolean>
-function M.acquire_tags()
-    return acquire_from(tags_pool)
-end
-
---- 将表归还 tags 对象池
----@param t table
-function M.release_tags(t)
-    release_to(tags_pool, t)
-end
-
---- 从 attrs 对象池获取一张已清空的表
----@return table
-function M.acquire_attrs()
-    return acquire_from(attrs_pool)
-end
-
---- 将表归还 attrs 对象池
----@param t table
-function M.release_attrs(t)
-    release_to(attrs_pool, t)
-end
-
---- 从 evaluate_args 对象池获取一张已清空的表
----@return table
-function M.acquire_evaluate_args()
-    return acquire_from(evaluate_args_pool)
-end
-
---- 将表归还 evaluate_args 对象池
----@param t table
-function M.release_evaluate_args(t)
-    release_to(evaluate_args_pool, t)
-end
-
---- 从 active_abilities 对象池获取一张已清空的表
----@return table
-function M.acquire_active_abilities()
-    return acquire_from(active_abilities_pool)
-end
-
---- 将表归还 active_abilities 对象池
----@param t table
-function M.release_active_abilities(t)
-    release_to(active_abilities_pool, t)
+function M.release_array(t)
+    if not t or t.__in_pool then
+        return
+    end
+    local n = t.n or 0
+    for i = 1, n do
+        t[i] = false
+    end
+    t.n = 0
+    t.__in_pool = true
+    table.insert(array_pool, t)
 end
 
 return M

@@ -9,7 +9,10 @@
 6. **ModifierAttributeEval 参数**：首次调用时固定传入 `id = nil, value = nil`，随后才是当前 Ability 产生的 `modifier_args`。`modifier_args` 来源：对象形式为 `{ count, ... }`；函数形式为函数返回的 `...`；为空时直接采用 `ASC.evaluate` 调用者传入的上下文参数。
 7. **数值稳定**：Modifier 聚合顺序固定：先累加 Add，再连乘 Multiply，最后判断 Override；最终值按 `AttributeDef.min/max` 截断。
 8. **单一 ApplyFun 与 target 级应用**：每个 `target` 实体在全部求值完成后，只调用一次 `ApplyFun`，传递聚合后的标签集合 `tags`（`table<mini_gas.Tag, boolean>`）与 `attributes` 映射（`table<mini_gas.ID, number>`）。Add 语义下 `attributes[id] = new_value - base`，业务方通过“旧值 + 差值”得到最终值。
-9. **对象池与所有权**：`pool.lua` 提供分类对象池：`tags_pool`、`attrs_pool`、`evaluate_args_pool`、`active_abilities_pool`，其余小型临时表复用通用 `table_pool`，降低 GC 压力。
+9. **对象池与所有权**：`pool.lua` 仅保留两类对象池：
+   - `table_pool`：键值型临时表，回收时通过 `pairs` 置 `nil`；用于 `tags`、`attributes`、`deltas`、`attr_entry`、`modifier_args` 等。
+   - `array_pool`：纯数组型临时表，回收时按 `t.n` 将元素置 `false` 并将 `t.n` 设为 `0`；用于 `evaluate_args`、`active_abilities`、`pairs_list` 及其元素等。
+   - `array_pool` 的表以 `.n` 作为长度标准，不使用 `#` 或 `ipairs`，避免回收残留的 `false` 影响长度计算。
    - `ApplyFun` 收到的 `tags` 与 `attributes` 归库所有，`apply` 返回后会被立即回收。
    - 所有对象池均带有重复释放保护，避免同一张表在池中出现多次。
    - 业务方如需在 `apply` 返回后继续保留数据，必须在回调内部完成复制。
