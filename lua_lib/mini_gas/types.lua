@@ -18,6 +18,12 @@
 --- 返回三个迭代值的 Lua 迭代器
 ---@alias mini_gas.Iterator3<P1, P2, P3> fun(state: any, key?: any): P1, P2, P3
 
+--- 调试钩子名
+---@alias mini_gas.DebugHookName "begin_ability" | "end_ability" | "begin_effect" | "end_effect" | "begin_modifier" | "end_modifier"
+
+--- 调试阶段名
+---@alias mini_gas.DebugStepPhase "evaluate_start" | "evaluate_end" | "missing_effect" | "invalid_modifier_attribute"
+
 --- 属性定义
 ---@class mini_gas.AttributeDef
 ---@field id mini_gas.ID
@@ -86,10 +92,11 @@
 --- 参数包括系统上下文、实体状态、ModifierDef 本身，以及可选的 id 和 value 参数；若需访问世界状态或定义，可通过 context.world / context.defs 获取。
 --- 返回一个属性 ID、一个数值，以及一个可选的下一个求值函数；若第三个返回值非 nil，则递归调用该函数继续求值。每次递归返回的 `(id, value)` 都作为一次独立的属性修改参与后续聚合。
 --- 首次调用时，id 与 value 均为 nil；后续递归调用时，id 与 value 分别为上一次调用返回的 id 与 value。
---- 参数尾部的 ... 始终为当前 Ability 产生的 modifier_args，其来源如下：
---- - 当 AbilityDef.can_activate 为 AbilityActivateCondition 对象形式时，modifier_args = { count, ... }，其中 count 为满足该条件标签约束的实体数量，后续 ... 来自 ASC.evaluate 调用者传入的上下文；
---- - 当 AbilityDef.can_activate 为 AbilityActivateConditionFunc 函数形式时，modifier_args 即为该函数返回的 ...；
---- - 当 AbilityDef.can_activate 为空时，Ability 默认激活，modifier_args 即为 ASC.evaluate 调用者传入的上下文。
+--- 参数尾部的 ... 始终为当前 Ability 产生的 modifier_args，格式统一为 { count, ... }：
+--- - 当 AbilityDef.can_activate 为 AbilityActivateCondition 对象形式时，count 为满足该条件标签约束的实体数量；
+--- - 当 AbilityDef.can_activate 为 AbilityActivateConditionFunc 函数形式时，count 为该函数返回的第二个 number（省略则视为 0）；
+--- - 当 AbilityDef.can_activate 为空时，count 为 0。
+--- 后续 ... 来自 ASC.evaluate 调用者传入的上下文。
 ---@alias mini_gas.ModifierAttributeEval fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.ModifierDef, id?: mini_gas.ID, value?: number, ...: unknown): mini_gas.ID, number, mini_gas.ModifierAttributeEval?
 
 --- 修饰器定义
@@ -122,8 +129,8 @@
 
 --- 激活条件函数
 --- 参数 ... 由 ASC.evaluate 的调用者传入，通常包含一些触发事件的来源等上下文信息；若需访问定义或世界状态，可通过 context.defs / context.world 获取。
---- 返回值的 ... 部分会作为 ModifierAttributeEval 函数末尾可变参数传入。
----@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, ...
+--- 返回值依次为：是否激活、匹配计数（省略则视为 0）、以及透传给 ModifierAttributeEval 的额外参数。
+---@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, number, ...
 
 --- 能力定义
 ---@class mini_gas.AbilityDef

@@ -2,7 +2,6 @@
 
 local tag = require("mini_gas.tag")
 local pool = require("mini_gas.pool")
-local debug_helper = require("mini_gas.debug")
 
 local M = {}
 
@@ -38,49 +37,69 @@ local function pack_results(...)
 end
 
 --- 评估 Ability 激活条件，返回是否激活以及 modifier_args
---- modifier_args 需要调用方负责回收（当 need_release 为 true 时）
+--- 三种 can_activate 形式的 modifier_args 格式统一为 { count, ... }：
+--- - 对象形式：count 为满足标签约束的实体数量
+--- - 函数形式：count 为函数返回的第二个 number，省略则视为 0
+--- - 为空时：count 为 0
+--- 未激活时 modifier_args 为 nil；激活时由调用方负责回收
 ---@param context mini_gas.IContext
+---@param owner_id mini_gas.ID
 ---@param owner_entity mini_gas.IEntityState
 ---@param ability_def mini_gas.AbilityDef
 ---@param evaluate_args table
 ---@return boolean activated
----@return table modifier_args
----@return boolean need_release
-function M.check_can_activate(context, owner_entity, ability_def, evaluate_args)
+---@return table|nil modifier_args
+function M.check_can_activate(context, owner_id, owner_entity, ability_def, evaluate_args)
     local can_activate = ability_def.can_activate
-
-    -- 为空时默认激活，modifier_args 直接使用 evaluate_args
-    if can_activate == nil then
-        return true, evaluate_args, false
-    end
 
     -- 对象形式：统计匹配实体数并打包 { count, ... }
     if type(can_activate) == "table" then
-        local count = count_matching_entities(context, can_activate, ability_def.id)
+        local count = count_matching_entities(context, can_activate, owner_id)
         local active = count >= (can_activate.requires_count or 1)
+        if not active then
+            return false, nil
+        end
         local modifier_args = pool.acquire_short_array()
         modifier_args[1] = count
         for i = 1, evaluate_args.n do
             modifier_args[i + 1] = evaluate_args[i]
         end
         modifier_args.n = evaluate_args.n + 1
-        return active, modifier_args, true
+        return true, modifier_args
     end
 
-    -- 函数形式：返回 boolean, ...，打包 ... 作为 modifier_args
+    -- 函数形式：返回 boolean, number, ...，打包 { number, ... } 作为 modifier_args
     if type(can_activate) == "function" then
         local packed = pack_results(can_activate(context, owner_entity, ability_def, table.unpack(evaluate_args, 1, evaluate_args.n)))
         local active = packed[1] == true
-        local results = pool.acquire_short_array()
-        for i = 2, packed.n do
-            results[i - 1] = packed[i]
+        if not active then
+            pool.release_short_array(packed)
+            return false, nil
         end
-        results.n = packed.n - 1
+        local count = packed[2] or 0
+        local modifier_args = pool.acquire_short_array()
+        modifier_args[1] = count
+        for i = 3, packed.n do
+            modifier_args[i - 1] = packed[i]
+        end
+        modifier_args.n = packed.n - 1
         pool.release_short_array(packed)
-        return active, results, true
+        return true, modifier_args
     end
 
-    return false, evaluate_args, false
+    -- 为空时默认激活，modifier_args 为 { 0, ... }
+    if can_activate == nil then
+        local modifier_args = pool.acquire_short_array()
+        modifier_args[1] = 0
+        for i = 1, evaluate_args.n do
+            modifier_args[i + 1] = evaluate_args[i]
+        end
+        modifier_args.n = evaluate_args.n + 1
+        return true, modifier_args
+    end
+
+    -- 不支持的形式：不激活
+    return false, nil
 end
 
 --- 阶段一：收集激活的能力
@@ -94,7 +113,9 @@ function M.collect_active_abilities(context, debug, evaluate_args)
     local defs = context.defs
     local world_module = context.world_module
 
-    debug_helper.call_step(debug, context, "evaluate_start")
+    if debug and debug.step then
+        debug.step(context, "evaluate_start")
+    end
 
     local idx = 0
     for owner_id, owner_entity, owner_module in world_module.entities(context) do
@@ -104,18 +125,18 @@ function M.collect_active_abilities(context, debug, evaluate_args)
                 goto continue_ability
             end
 
-            debug_helper.call_debug(
-                debug,
-                "begin_ability",
-                context,
-                owner_id,
-                owner_entity,
-                owner_module,
-                ability_id,
-                table.unpack(evaluate_args, 1, evaluate_args.n)
-            )
+            if debug and debug.begin_ability then
+                debug.begin_ability(
+                    context,
+                    owner_id,
+                    owner_entity,
+                    owner_module,
+                    ability_id,
+                    table.unpack(evaluate_args, 1, evaluate_args.n)
+                )
+            end
 
-            local active, modifier_args, need_release = M.check_can_activate(context, owner_entity, ability_def, evaluate_args)
+            local active, modifier_args = M.check_can_activate(context, owner_id, owner_entity, ability_def, evaluate_args)
 
             if active then
                 idx = idx + 1
@@ -124,20 +145,18 @@ function M.collect_active_abilities(context, debug, evaluate_args)
                 active_abilities[idx] = ability_id
                 idx = idx + 1
                 active_abilities[idx] = modifier_args
-            elseif need_release then
-                pool.release_short_array(modifier_args)
             end
 
-            debug_helper.call_debug(
-                debug,
-                "end_ability",
-                context,
-                owner_id,
-                owner_entity,
-                owner_module,
-                ability_id,
-                table.unpack(evaluate_args, 1, evaluate_args.n)
-            )
+            if debug and debug.end_ability then
+                debug.end_ability(
+                    context,
+                    owner_id,
+                    owner_entity,
+                    owner_module,
+                    ability_id,
+                    table.unpack(evaluate_args, 1, evaluate_args.n)
+                )
+            end
 
             ::continue_ability::
         end

@@ -3,7 +3,6 @@
 local enum = require("mini_gas.enum")
 local tag = require("mini_gas.tag")
 local modifier = require("mini_gas.modifier")
-local debug_helper = require("mini_gas.debug")
 
 local M = {}
 
@@ -66,17 +65,17 @@ function M.evaluate_effect(
         return
     end
 
-    debug_helper.call_debug(
-        debug,
-        "begin_effect",
-        context,
-        owner_id,
-        owner_entity,
-        owner_module,
-        ability_id,
-        effect_id,
-        table.unpack(evaluate_args, 1, evaluate_args.n)
-    )
+    if debug and debug.begin_effect then
+        debug.begin_effect(
+            context,
+            owner_id,
+            owner_entity,
+            owner_module,
+            ability_id,
+            effect_id,
+            table.unpack(evaluate_args, 1, evaluate_args.n)
+        )
+    end
 
     -- 授予标签
     if effect_def.grant_tags then
@@ -107,17 +106,17 @@ function M.evaluate_effect(
         end
     end
 
-    debug_helper.call_debug(
-        debug,
-        "end_effect",
-        context,
-        owner_id,
-        owner_entity,
-        owner_module,
-        ability_id,
-        effect_id,
-        table.unpack(evaluate_args, 1, evaluate_args.n)
-    )
+    if debug and debug.end_effect then
+        debug.end_effect(
+            context,
+            owner_id,
+            owner_entity,
+            owner_module,
+            ability_id,
+            effect_id,
+            table.unpack(evaluate_args, 1, evaluate_args.n)
+        )
+    end
 end
 
 return M

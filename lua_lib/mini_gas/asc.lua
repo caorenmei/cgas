@@ -6,7 +6,6 @@ local tag = require("mini_gas.tag")
 local ability = require("mini_gas.ability")
 local effect = require("mini_gas.effect")
 local pool = require("mini_gas.pool")
-local debug_helper = require("mini_gas.debug")
 
 local ASC = {}
 
@@ -62,7 +61,9 @@ local function apply_to_targets(context, debug, apply, active_abilities, evaluat
             for _, effect_id in ipairs(ability_def.effects or EMPTY_EFFECTS) do
                 local effect_def = defs.effect_defs[effect_id]
                 if not effect_def then
-                    debug_helper.call_step(debug, context, "missing_effect", owner_id, ability_id, effect_id)
+                    if debug and debug.step then
+                        debug.step(context, "missing_effect", owner_id, ability_id, effect_id)
+                    end
                     goto continue_effect
                 end
 
@@ -133,7 +134,9 @@ function ASC.evaluate(context, apply, ...)
     apply_to_targets(context, debug, apply, active_abilities, evaluate_args)
     ability.release_active_abilities(active_abilities)
 
-    debug_helper.call_step(debug, context, "evaluate_end")
+    if debug and debug.step then
+        debug.step(context, "evaluate_end")
+    end
 
     pool.release_short_array(evaluate_args)
 end

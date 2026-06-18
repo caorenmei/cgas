@@ -341,6 +341,59 @@ describe("mini_gas v2 asc", function()
         assert.equal(2, total_tag_count) -- a and b each receive TAG_AURA once
     end)
 
+    it("evaluate excludes owner when include_self is false", function()
+        local a = {
+            attrs = {},
+            static_tags = { [TAG_COMMANDER] = true },
+            static_abilities = { [ABILITY_AURA] = true },
+        }
+        local b = {
+            attrs = {},
+            static_tags = { [TAG_COMMANDER] = true },
+            static_abilities = {},
+        }
+        local modules = { a = make_entity_module(a), b = make_entity_module(b) }
+        local world = { entities = { a = a, b = b } }
+        local world_module = make_world_module(world, modules)
+
+        local defs = {
+            attribute_defs = {},
+            effect_defs = {
+                [EFFECT_AURA] = {
+                    id = EFFECT_AURA,
+                    target = EEffectTarget.All,
+                    grant_tags = { TAG_AURA },
+                    modifiers = {},
+                },
+            },
+            ability_defs = {
+                [ABILITY_AURA] = {
+                    id = ABILITY_AURA,
+                    activation_policy = EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_AURA },
+                    can_activate = {
+                        allof_tags = { TAG_COMMANDER },
+                        requires_count = 2,
+                        include_self = false,
+                    },
+                },
+            },
+        }
+
+        local total_tag_count = 0
+        local function apply(_, _, tags)
+            for _ in pairs(tags) do
+                total_tag_count = total_tag_count + 1
+            end
+        end
+
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, apply)
+        -- a 被排除，世界中只有 a、b 两个 TAG_COMMANDER，但 requires_count=2 且 exclude self
+        -- 因此需要 a 和 b 都被计入且 exclude a，实际只统计 b，数量不足 2，能力不应激活
+        assert.equal(0, total_tag_count)
+    end)
+
     it("evaluate passes condition function extras to modifier functions", function()
         local entity = {
             attrs = { [ATTR_GOLD] = 0 },
@@ -358,7 +411,7 @@ describe("mini_gas v2 asc", function()
                     id = EFFECT_SWORD,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, extra)
+                            attribute = function(_, _, _, _, _, _, extra)
                                 local level = extra and extra.level or 1
                                 return ATTR_GOLD, 100 * level
                             end,
@@ -373,7 +426,7 @@ describe("mini_gas v2 asc", function()
                     activation_policy = EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_SWORD },
                     can_activate = function(_, _, _)
-                        return true, { level = 3 }
+                        return true, 1, { level = 3 }
                     end,
                 },
             },
@@ -383,6 +436,91 @@ describe("mini_gas v2 asc", function()
         local context = make_context(world, world_module, defs)
         mini_gas.evaluate(context, make_apply(deltas))
         assert.equal(300, deltas[entity][ATTR_GOLD])
+    end)
+
+    it("evaluate passes condition function count as first vararg to modifier functions", function()
+        local entity = {
+            attrs = { [ATTR_GOLD] = 0 },
+            static_tags = {},
+            static_abilities = { [ABILITY_SWORD] = true },
+        }
+        local modules = { hero = make_entity_module(entity) }
+        local world = { entities = { hero = entity } }
+        local world_module = make_world_module(world, modules)
+
+        local received_count
+        local defs = {
+            attribute_defs = {},
+            effect_defs = {
+                [EFFECT_SWORD] = {
+                    id = EFFECT_SWORD,
+                    modifiers = {
+                        {
+                            attribute = function(_, _, _, _, _, count)
+                                received_count = count
+                                return ATTR_GOLD, 1.1
+                            end,
+                            op = EModifierOp.Multiply,
+                        },
+                    },
+                },
+            },
+            ability_defs = {
+                [ABILITY_SWORD] = {
+                    id = ABILITY_SWORD,
+                    activation_policy = EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_SWORD },
+                    can_activate = function(_, _, _)
+                        return true, 5
+                    end,
+                },
+            },
+        }
+
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, make_apply({}))
+        assert.equal(5, received_count)
+    end)
+
+    it("evaluate passes zero count for nil can_activate", function()
+        local entity = {
+            attrs = { [ATTR_GOLD] = 0 },
+            static_tags = {},
+            static_abilities = { [ABILITY_SWORD] = true },
+        }
+        local modules = { hero = make_entity_module(entity) }
+        local world = { entities = { hero = entity } }
+        local world_module = make_world_module(world, modules)
+
+        local received_count
+        local defs = {
+            attribute_defs = {},
+            effect_defs = {
+                [EFFECT_SWORD] = {
+                    id = EFFECT_SWORD,
+                    modifiers = {
+                        {
+                            attribute = function(_, _, _, _, _, count)
+                                received_count = count
+                                return ATTR_GOLD, 1.1
+                            end,
+                            op = EModifierOp.Multiply,
+                        },
+                    },
+                },
+            },
+            ability_defs = {
+                [ABILITY_SWORD] = {
+                    id = ABILITY_SWORD,
+                    activation_policy = EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_SWORD },
+                },
+            },
+        }
+
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, make_apply({}))
+        assert.equal(0, received_count)
     end)
 
     it("evaluate passes condition object count as first vararg to modifier functions", function()

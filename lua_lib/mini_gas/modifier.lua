@@ -3,7 +3,6 @@
 local enum = require("mini_gas.enum")
 local tag = require("mini_gas.tag")
 local pool = require("mini_gas.pool")
-local debug_helper = require("mini_gas.debug")
 
 local M = {}
 
@@ -83,24 +82,24 @@ function M.evaluate_modifier(
         return
     end
 
-    debug_helper.call_debug(
-        debug,
-        "begin_modifier",
-        context,
-        owner_id,
-        owner_entity,
-        owner_module,
-        ability_id,
-        effect_id,
-        modifier_def,
-        target_entity,
-        target_module,
-        table.unpack(evaluate_args, 1, evaluate_args.n)
-    )
+    if debug and debug.begin_modifier then
+        debug.begin_modifier(
+            context,
+            owner_id,
+            owner_entity,
+            owner_module,
+            ability_id,
+            effect_id,
+            modifier_def,
+            target_entity,
+            target_module,
+            table.unpack(evaluate_args, 1, evaluate_args.n)
+        )
+    end
 
     local pairs_list, invalid = M.resolve_modifier_attribute(context, target_entity, modifier_def, modifier_args)
-    if invalid then
-        debug_helper.call_step(debug, context, "invalid_modifier_attribute", owner_id, ability_id, effect_id, modifier_def, target_id)
+    if invalid and debug and debug.step then
+        debug.step(context, "invalid_modifier_attribute", owner_id, ability_id, effect_id, modifier_def, target_id)
     end
 
     for i = 1, pairs_list.n, 2 do
@@ -127,20 +126,20 @@ function M.evaluate_modifier(
 
     pool.release_short_array(pairs_list)
 
-    debug_helper.call_debug(
-        debug,
-        "end_modifier",
-        context,
-        owner_id,
-        owner_entity,
-        owner_module,
-        ability_id,
-        effect_id,
-        modifier_def,
-        target_entity,
-        target_module,
-        table.unpack(evaluate_args, 1, evaluate_args.n)
-    )
+    if debug and debug.end_modifier then
+        debug.end_modifier(
+            context,
+            owner_id,
+            owner_entity,
+            owner_module,
+            ability_id,
+            effect_id,
+            modifier_def,
+            target_entity,
+            target_module,
+            table.unpack(evaluate_args, 1, evaluate_args.n)
+        )
+    end
 end
 
 return M

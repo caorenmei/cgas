@@ -92,7 +92,7 @@ describe("mini_gas v2 integration", function()
                     id = EFFECT_BUILDING,
                     modifiers = {
                         {
-                            attribute = function(_, _, _, _, _, extra)
+                            attribute = function(_, _, _, _, _, _, extra)
                                 local world_level = extra and extra.world_level or 1
                                 return ATTR_GOLD, 100 * world_level
                             end,
@@ -129,7 +129,7 @@ describe("mini_gas v2 integration", function()
                     activation_policy = mini_gas.EAbilityActivationPolicy.Passive,
                     effects = { EFFECT_BUILDING },
                     can_activate = function(_, _, _)
-                        return true, { world_level = 3 }
+                        return true, 1, { world_level = 3 }
                     end,
                 },
                 [ABILITY_AURA] = {
