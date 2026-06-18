@@ -3,17 +3,18 @@
 local enum = require("mini_gas.enum")
 local asc = require("mini_gas.asc")
 
-local M = {}
+---@type mini_gas.ASC
+local M = {
+    -- 枚举
+    EModifierOp = enum.EModifierOp,
+    EAbilityActivationPolicy = enum.EAbilityActivationPolicy,
+    EEffectTarget = enum.EEffectTarget,
 
--- 枚举
-M.EModifierOp = enum.EModifierOp
-M.EAbilityActivationPolicy = enum.EAbilityActivationPolicy
-M.EEffectTarget = enum.EEffectTarget
-
--- 求值入口与标签匹配工具
-M.match_tag = asc.match_tag
-M.entity_match_tag = asc.entity_match_tag
-M.match_tags = asc.match_tags
-M.evaluate = asc.evaluate
+    -- 求值入口与标签匹配工具
+    match_tag = asc.match_tag,
+    entity_match_tag = asc.entity_match_tag,
+    match_tags = asc.match_tags,
+    evaluate = asc.evaluate,
+}
 
 return M

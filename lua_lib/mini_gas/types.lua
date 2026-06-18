@@ -82,11 +82,12 @@
 ---@field end_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, ...: unknown)
 ---@field begin_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
 ---@field end_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
----@field step? fun(context: mini_gas.IContext, phase: string, ...: unknown)
+---@field step? fun(context: mini_gas.IContext, phase: mini_gas.DebugStepPhase, ...: unknown)
 
 --- 最终应用函数：每个实体在全部求值完成后调用一次。
+--- `attribute_deltas` 为属性变化量（new_value - old_value），已由库完成 min/max 截断。
 --- 尾部的 `...` 为 `ASC.evaluate` 调用者传入的上下文参数。
----@alias mini_gas.ApplyFun fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, tags: table<mini_gas.Tag, boolean>, attributes: table<mini_gas.ID, number>, ...: unknown)
+---@alias mini_gas.ApplyFun fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, tags: table<mini_gas.Tag, boolean>, attribute_deltas: table<mini_gas.ID, number>, ...: unknown)
 
 --- ModifierDef 中 attribute 字段的函数形式定义。
 --- 参数包括系统上下文、实体状态、ModifierDef 本身，以及可选的 id 和 value 参数；若需访问世界状态或定义，可通过 context.world / context.defs 获取。
@@ -94,9 +95,9 @@
 --- 首次调用时，id 与 value 均为 nil；后续递归调用时，id 与 value 分别为上一次调用返回的 id 与 value。
 --- 参数尾部的 ... 始终为当前 Ability 产生的 modifier_args，格式统一为 { count, ... }：
 --- - 当 AbilityDef.can_activate 为 AbilityActivateCondition 对象形式时，count 为满足该条件标签约束的实体数量；
---- - 当 AbilityDef.can_activate 为 AbilityActivateConditionFunc 函数形式时，count 为该函数返回的第二个 number（省略则视为 0）；
+--- - 当 AbilityDef.can_activate 为 AbilityActivateConditionFunc 函数形式时，count 为该函数返回的第二个值（省略则视为 0），再之后的返回值依次追加；
 --- - 当 AbilityDef.can_activate 为空时，count 为 0。
---- 后续 ... 来自 ASC.evaluate 调用者传入的上下文。
+--- 再之后的 ... 来自 ASC.evaluate 调用者传入的上下文。
 ---@alias mini_gas.ModifierAttributeEval fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.ModifierDef, id?: mini_gas.ID, value?: number, ...: unknown): mini_gas.ID, number, mini_gas.ModifierAttributeEval?
 
 --- 修饰器定义
@@ -124,13 +125,13 @@
 ---@field allof_tags? mini_gas.Tag[]
 ---@field anyof_tags? mini_gas.Tag[]
 ---@field noneof_tags? mini_gas.Tag[]
----@field requires_count integer 激活所需的最小匹配实体数量；当满足上述标签约束的实体数量大于等于该值时，Ability 激活；省略时默认值为 1；设为 0 时表示无需匹配任何实体即可激活
+---@field requires_count? integer 激活所需的最小匹配实体数量；当满足上述标签约束的实体数量大于等于该值时，Ability 激活；省略时默认值为 1；设为 0 时表示无需匹配任何实体即可激活
 ---@field include_self? boolean 统计匹配实体数量时是否包含当前实体自身；默认为 true
 
 --- 激活条件函数
 --- 参数 ... 由 ASC.evaluate 的调用者传入，通常包含一些触发事件的来源等上下文信息；若需访问定义或世界状态，可通过 context.defs / context.world 获取。
---- 返回值依次为：是否激活、匹配计数（省略则视为 0）、以及透传给 ModifierAttributeEval 的额外参数。
----@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, number, ...
+--- 返回值依次为：是否激活、透传给 ModifierAttributeEval 的第一个元素（省略则视为 0）、以及后续额外参数。
+---@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, any, ...
 
 --- 能力定义
 ---@class mini_gas.AbilityDef
@@ -141,6 +142,10 @@
 
 --- 能力系统组件入口
 ---@class mini_gas.ASC
+---@field evaluate fun(context: mini_gas.IContext, apply: mini_gas.ApplyFun, ...: unknown)
+---@field match_tag fun(a: mini_gas.Tag, b: mini_gas.Tag): boolean
+---@field entity_match_tag fun(entity: mini_gas.IEntityState, module: mini_gas.IEntityModule, pattern: mini_gas.Tag): boolean
+---@field match_tags fun(entity: mini_gas.IEntityState, module: mini_gas.IEntityModule, allof_tags?: mini_gas.Tag[], anyof_tags?: mini_gas.Tag[], noneof_tags?: mini_gas.Tag[]): boolean
 local ASC = {}
 
 return ASC

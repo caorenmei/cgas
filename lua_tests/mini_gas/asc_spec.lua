@@ -760,4 +760,51 @@ describe("mini_gas v2 asc", function()
         assert.equal("step", events[8][1])
         assert.equal("evaluate_end", events[8][2])
     end)
+
+    it("evaluate passes zero count and evaluate args when condition function only returns true", function()
+        local entity = {
+            attrs = { [ATTR_GOLD] = 0 },
+            static_tags = {},
+            static_abilities = { [ABILITY_SWORD] = true },
+        }
+        local modules = { hero = make_entity_module(entity) }
+        local world = { entities = { hero = entity } }
+        local world_module = make_world_module(world, modules)
+
+        local received_count
+        local received_extra
+        local defs = {
+            attribute_defs = {},
+            effect_defs = {
+                [EFFECT_SWORD] = {
+                    id = EFFECT_SWORD,
+                    modifiers = {
+                        {
+                            attribute = function(_, _, _, _, _, count, extra)
+                                received_count = count
+                                received_extra = extra
+                                return ATTR_GOLD, 1.1
+                            end,
+                            op = EModifierOp.Multiply,
+                        },
+                    },
+                },
+            },
+            ability_defs = {
+                [ABILITY_SWORD] = {
+                    id = ABILITY_SWORD,
+                    activation_policy = EAbilityActivationPolicy.Passive,
+                    effects = { EFFECT_SWORD },
+                    can_activate = function(_, _, _)
+                        return true
+                    end,
+                },
+            },
+        }
+
+        local context = make_context(world, world_module, defs)
+        mini_gas.evaluate(context, make_apply({}), { level = 2 })
+        assert.equal(0, received_count)
+        assert.equal(2, received_extra.level)
+    end)
 end)

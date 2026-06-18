@@ -13,7 +13,6 @@ lua_lib/
     ├── effect.lua                 -- Effect 目标匹配与应用
     ├── modifier.lua               -- Modifier 解析与属性聚合
     ├── pool.lua                   -- 分类对象池
-    └── debug.lua                  -- 调试钩子辅助函数
 ```
 
 > MiniGas V2 为自包含实现，所有代码均在 `lua_lib/mini_gas/` 内，不依赖任何外部 GAS 库。
@@ -73,7 +72,7 @@ function mini_gas.match_tags(entity, module, allof_tags, anyof_tags, noneof_tags
 function mini_gas.evaluate(context, apply, ...) end
 ```
 
-`ApplyFun` 在每个 `target` 实体全部求值完成后调用一次，传递该实体获得的所有授予标签集合（`table<mini_gas.Tag, boolean>`）与属性变化映射。`tags` 与 `attributes` 归库所有，`apply` 返回后会被回收。可选的 `IDebug` 通过 `context.debug` 传入，用于日志或副作用。
+`ApplyFun` 在每个 `target` 实体全部求值完成后调用一次，传递该实体获得的所有授予标签集合（`table<mini_gas.Tag, boolean>`）与 `attribute_deltas` 映射（`table<mini_gas.ID, number>`）。`tags` 与 `attribute_deltas` 归库所有，`apply` 返回后会被回收。可选的 `IDebug` 通过 `context.debug` 传入，用于日志或副作用。
 
 ### 10.5 内部模块
 
@@ -86,7 +85,6 @@ function mini_gas.evaluate(context, apply, ...) end
 | `mini_gas.effect` | Effect 目标匹配与应用 |
 | `mini_gas.modifier` | Modifier 解析与聚合 |
 | `mini_gas.pool` | 三类对象池：`table_pool`（键值表）、`short_array_pool`（短数组表）与 `long_array_pool`（长数组表） |
-| `mini_gas.debug` | 调试钩子辅助函数 |
 
 ---
 

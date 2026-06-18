@@ -3,7 +3,7 @@
 
 ### 1.1 快照式全量求值
 
-MiniGas V2 不维护运行时状态，也不推进时间。调用方将 `world`、`world_module`、`defs` 组装进 `context`，通过 `ASC.evaluate(context, debug, apply, ...)` 一次性计算世界最终状态。
+MiniGas V2 不维护运行时状态，也不推进时间。调用方将 `world`、`world_module`、`defs` 组装进 `context`，通过 `ASC.evaluate(context, apply, ...)` 一次性计算世界最终状态。可选的 `IDebug` 接口通过 `context.debug` 传入。
 
 ### 1.2 接口化解耦
 
@@ -96,11 +96,11 @@ flowchart TD
 最终应用函数：每个实体在全部求值完成后调用一次。
 
 ```lua
----@alias mini_gas.ApplyFun fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, tags: table<mini_gas.Tag, boolean>, attributes: table<mini_gas.ID, number>, ...: unknown)
+---@alias mini_gas.ApplyFun fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, tags: table<mini_gas.Tag, boolean>, attribute_deltas: table<mini_gas.ID, number>, ...: unknown)
 ```
 
 - `tags`：本次求值授予该实体的所有标签集合，`{ [tag] = true }`。
-- `attributes`：属性 ID 到 add 语义差值的映射（`new_value - old_value`），业务方应将其加到旧值上得到最终值。
+- `attribute_deltas`：属性 ID 到 add 语义差值的映射（`new_value - old_value`），已由库完成 min/max 截断，业务方应将其加到旧值上得到最终值。
 - 尾部的 `...` 为 `ASC.evaluate` 调用者传入的上下文参数。
 
 ---

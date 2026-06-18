@@ -2,6 +2,7 @@
 
 local tag = require("mini_gas.tag")
 local pool = require("mini_gas.pool")
+local enum = require("mini_gas.enum")
 
 local M = {}
 
@@ -68,7 +69,7 @@ function M.check_can_activate(context, owner_id, owner_entity, ability_def, eval
         return true, modifier_args
     end
 
-    -- 函数形式：返回 boolean, number, ...，打包 { number, ... } 作为 modifier_args
+    -- 函数形式：返回 boolean, any, ...，打包 { count, ... } 作为 modifier_args
     if type(can_activate) == "function" then
         local packed = pack_results(can_activate(context, owner_entity, ability_def, table.unpack(evaluate_args, 1, evaluate_args.n)))
         local active = packed[1] == true
@@ -78,11 +79,17 @@ function M.check_can_activate(context, owner_id, owner_entity, ability_def, eval
         end
         local count = packed[2] or 0
         local modifier_args = pool.acquire_short_array()
+        local idx = 1
         modifier_args[1] = count
         for i = 3, packed.n do
-            modifier_args[i - 1] = packed[i]
+            idx = idx + 1
+            modifier_args[idx] = packed[i]
         end
-        modifier_args.n = packed.n - 1
+        for i = 1, evaluate_args.n do
+            idx = idx + 1
+            modifier_args[idx] = evaluate_args[i]
+        end
+        modifier_args.n = idx
         pool.release_short_array(packed)
         return true, modifier_args
     end
@@ -122,6 +129,9 @@ function M.collect_active_abilities(context, debug, evaluate_args)
         for ability_id, _ in owner_module.static_abilities(owner_entity) do
             local ability_def = defs.ability_defs[ability_id]
             if not ability_def then
+                goto continue_ability
+            end
+            if ability_def.activation_policy ~= enum.EAbilityActivationPolicy.Passive then
                 goto continue_ability
             end
 

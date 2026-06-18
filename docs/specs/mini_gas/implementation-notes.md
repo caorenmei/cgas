@@ -4,18 +4,18 @@
 1. **纯 Lua 表**：不依赖任何外部库，除 Lua 标准库外无依赖。
 2. **无状态库**：MiniGas V2 不维护任何运行时状态，所有状态由调用方通过 `IEntityState` / `IWorldState` 传入并持有。
 3. **接口化解耦**：通过 `IEntityModule`、`IWorldModule`、`IContext`（含可选 `IDebug`）、`ApplyFun` 与业务状态解耦，便于集成到现有系统。
-4. **模块拆分**：`asc.lua` 仅保留公共 API 聚合与主控求值流程，具体逻辑按职责拆分到 `tag.lua`、`ability.lua`、`effect.lua`、`modifier.lua`、`pool.lua`、`debug.lua`，保持核心文件轻量。
+4. **模块拆分**：`asc.lua` 仅保留公共 API 聚合与主控求值流程，具体逻辑按职责拆分到 `tag.lua`、`ability.lua`、`effect.lua`、`modifier.lua`、`pool.lua`，保持核心文件轻量。
 5. **迭代器陷阱**：`IEntityModule` 与 `IWorldModule` 的迭代器均返回 `(iterator, state)` 二元组；库内部使用 `for ... in iterator, state` 避免 `local k, v = next(t, k)` 导致的局部变量遮蔽死循环。
-6. **ModifierAttributeEval 参数**：首次调用时固定传入 `id = nil, value = nil`，随后才是当前 Ability 产生的 `modifier_args`。`modifier_args` 来源：对象形式为 `{ count, ... }`；函数形式为函数返回的 `...`；为空时直接采用 `ASC.evaluate` 调用者传入的上下文参数。
+6. **ModifierAttributeEval 参数**：首次调用时固定传入 `id = nil, value = nil`，随后才是当前 Ability 产生的 `modifier_args`。`modifier_args` 来源：对象形式为 `{ count, ... }`；函数形式为 `{ count, ... }`，其中 `count` 为函数第二个返回值（省略则视为 0），再之后的返回值依次追加，最后为 `ASC.evaluate` 调用者传入的上下文参数；为空时 `count` 为 0，其余为 `ASC.evaluate` 调用者传入的上下文参数。
 7. **数值稳定**：Modifier 聚合顺序固定：先累加 Add，再连乘 Multiply，最后判断 Override；最终值按 `AttributeDef.min/max` 截断。
-8. **单一 ApplyFun 与 target 级应用**：每个 `target` 实体在全部求值完成后，只调用一次 `ApplyFun`，传递聚合后的标签集合 `tags`（`table<mini_gas.Tag, boolean>`）与 `attributes` 映射（`table<mini_gas.ID, number>`）。Add 语义下 `attributes[id] = new_value - base`，业务方通过“旧值 + 差值”得到最终值。
+8. **单一 ApplyFun 与 target 级应用**：每个 `target` 实体在全部求值完成后，只调用一次 `ApplyFun`，传递聚合后的标签集合 `tags`（`table<mini_gas.Tag, boolean>`）与 `attribute_deltas` 映射（`table<mini_gas.ID, number>`）。Add 语义下 `attribute_deltas[id] = new_value - base`，业务方通过“旧值 + 差值”得到最终值。
 9. **对象池与所有权**：`pool.lua` 保留三类对象池：
    - `table_pool`：键值型临时表，回收时通过 `pairs` 置 `nil`；用于 `tags`、`attributes`、`deltas` 等键值映射。
    - `short_array_pool`：短数组型临时表，回收时按 `t.n` 将元素置 `false` 并将 `t.n` 设为 `0`；用于 `evaluate_args`、`modifier_args`、`pairs_list` 等生命周期较短或元素较少的数组。
    - `long_array_pool`：长数组型临时表，回收语义与 `short_array_pool` 相同，专门用于生命周期跨越整个求值流程且元素较多的 `active_abilities`。
    - 数组池的表以 `.n` 作为长度标准，不使用 `#` 或 `ipairs`，避免回收残留的 `false` 影响长度计算。
    - `attributes[attr_id]` 的聚合结构采用数组：`[1]` 为 Override 值（未覆盖时为 `false`），`[2]` 为 Add 累加和，`[3]` 为 Multiply 连乘积；数组元素避免使用 `nil` 占位，防止数组空洞。
-   - `ApplyFun` 收到的 `tags` 与 `attributes` 归库所有，`apply` 返回后会被立即回收。
+   - `ApplyFun` 收到的 `tags` 与 `attribute_deltas` 归库所有，`apply` 返回后会被立即回收。
    - 所有对象池均带有重复释放保护，避免同一张表在池中出现多次。
    - 业务方如需在 `apply` 返回后继续保留数据，必须在回调内部完成复制。
 10. **错误隔离**：非法配置（不存在的 AbilityDef / EffectDef）静默跳过，不中断其他计算。
@@ -30,7 +30,7 @@
 | v2.0 | 2026-06-14 | 完全重构为快照式、被动-only、接口化解耦的轻量 GAS 核心；目录保持 `lua_lib/mini_gas`；移除主动技能、冷却、消耗、事件、任务等机制 |
 | v2.1 | 2026-06-16 | 统一 Module 参数透传；IEvaluation 回调合并为单一 `apply`；引入模块内部对象池减少 GC |
 | v2.2 | 2026-06-17 | 按 `docs/specs/mini_gas_v2/` 完全重写接口：`IContext` 聚合 `world`/`world_module`/`defs`；`IDebug` / `ApplyFun` 替代 `IEvaluation`；两阶段求值流程；简化 `ModifierAttributeEval` 与 `AbilityActivateConditionFunc` 签名 |
-| v2.3 | 2026-06-17 | 拆分 `asc.lua` 为 `tag`/`ability`/`effect`/`modifier`/`pool`/`debug` 子模块；`IDebug` 改为 `IContext.debug`；对象池分类为 `table_pool`/`short_array_pool`/`long_array_pool`；`ability_def_id`/`effect_def_id` 重命名为 `ability_id`/`effect_id` |
+| v2.3 | 2026-06-17 | 拆分 `asc.lua` 为 `tag`/`ability`/`effect`/`modifier`/`pool` 子模块；`IDebug` 改为 `IContext.debug`；对象池分类为 `table_pool`/`short_array_pool`/`long_array_pool`；`ability_def_id`/`effect_def_id` 重命名为 `ability_id`/`effect_id` |
 | v2.4 | 2026-06-17 | `resolve_modifier_attribute` 改为紧凑数组 `[i * 2 - 1] = id, [i * 2] = value` 以减少临时表；`attributes[attr_id]` 的聚合结构改为数组 `[1] override, [2] add, [3] multiply` |
 
 ---

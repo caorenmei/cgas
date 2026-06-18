@@ -11,7 +11,7 @@
 
 - 属性的旧值由 `IEntityModule.get_attribute(entity, id)` 决定，`AttributeDef` 本身不定义初始值。
 - 不在 `Defs.attribute_defs` 中定义的属性，仍按 `IEntityModule.get_attribute` 的返回值作为旧值，且不检查最大值和最小值约束。
-- 库在聚合所有生效的 Modifier 后，会按 `Defs.attribute_defs[id]` 中的 `min` 与 `max` 对最终值做截断；未定义 `min` 或 `max` 时，对应方向不限制。最终传给 `ApplyFun` 的 `attributes[id]` 已经是截断后的 `new_value - old_value`。
+- 库在聚合所有生效的 Modifier 后，会按 `Defs.attribute_defs[id]` 中的 `min` 与 `max` 对最终值做截断；未定义 `min` 或 `max` 时，对应方向不限制。最终传给 `ApplyFun` 的 `attribute_deltas[id]` 已经是截断后的 `new_value - old_value`。
 - `ApplyFun` 的 `tags` 参数为本次求值授予该实体的所有标签集合，类型为 `table<mini_gas.Tag, boolean>`，键为标签，值为 `true`。
 - `tags` 与 `attributes` 由库持有所有权，`apply` 返回后会被立即回收；业务方如需跨回调保留，必须在 `apply` 内部复制。
 
@@ -36,8 +36,12 @@ attributes[id] = final - base
 ### 6.4 Ability 激活条件
 
 - 若 `can_activate` 为空，Ability 默认激活。
-- 若为 `AbilityActivateCondition` 对象形式，在世界中统计满足该条件标签约束的实体数量；`include_self` 为 true（默认）时包含当前能力实体自身。当数量大于等于 `requires_count` 时激活。该匹配数量会作为 `ModifierAttributeEval` 末尾可变参数的第一个参数。
-- 若为 `AbilityActivateConditionFunc` 函数形式，调用该函数；返回值的 `...` 部分会作为 `ModifierAttributeEval` 末尾可变参数。
+- 若为 `AbilityActivateCondition` 对象形式，在世界中统计满足该条件标签约束的实体数量；`include_self` 为 true（默认）时包含当前能力实体自身。当数量大于等于 `requires_count` 时激活；`requires_count` 省略时默认值为 1，设为 0 表示无需匹配任何实体即可激活。该匹配数量会作为 `ModifierAttributeEval` 末尾可变参数的第一个参数。
+- 若为 `AbilityActivateConditionFunc` 函数形式，调用该函数：
+  - 第一个返回值为 boolean，表示是否激活；
+  - 第二个返回值作为 `ModifierAttributeEval` 可变参数的第一个元素，省略时视为 0；
+  - 再之后的返回值依次追加；
+  - `ASC.evaluate` 调用者传入的上下文参数排在它们之后。
 
 ### 6.5 Effect 目标范围
 
@@ -52,7 +56,7 @@ attributes[id] = final - base
 `ASC.evaluate(context, apply, ...)` 采用两阶段流程，`IDebug` 通过 `context.debug` 传入：
 
 1. **收集阶段**：遍历世界所有实体作为 `owner`，再遍历每个 Ability；激活的能力以 `[owner_id, ability_id, modifier_args]` 三元组形式存入 `active_abilities`。
-2. **应用阶段**：再次遍历世界每个 `target` 实体，遍历 `active_abilities`，将可作用的 `grant_tags` 与 Modifier 结果聚合到该实体的 `tags` / `attributes` 中，最后调用一次 `ApplyFun`。
+2. **应用阶段**：再次遍历世界每个 `target` 实体，遍历 `active_abilities`，将可作用的 `grant_tags` 与 Modifier 结果聚合到该实体的 `tags` / `attribute_deltas` 中，最后调用一次 `ApplyFun`。
 
 本次求值中所有标签约束（AbilityActivateCondition、EffectDef、ModifierDef）均只依据实体通过 `IEntityModule` 提供的静态标签进行判断；`grant_tags` 仅作为输出写入 `tags` 集合，不影响同一次 `ASC.evaluate` 内的其它判定。
 

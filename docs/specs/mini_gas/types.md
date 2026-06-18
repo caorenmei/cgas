@@ -11,6 +11,7 @@
 ---@alias mini_gas.Iterator<P1> fun(state: any, key?: any): P1
 ---@alias mini_gas.Iterator2<P1, P2> fun(state: any, key?: any): P1, P2
 ---@alias mini_gas.Iterator3<P1, P2, P3> fun(state: any, key?: any): P1, P2, P3
+---@alias mini_gas.DebugStepPhase "evaluate_start" | "evaluate_end" | "missing_effect" | "invalid_modifier_attribute"
 ```
 
 ### 5.2 枚举
@@ -70,13 +71,13 @@ local EEffectTarget = {
 ---@field end_effect? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, ...: unknown)
 ---@field begin_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
 ---@field end_modifier? fun(context: mini_gas.IContext, owner_id: mini_gas.ID, owner_entity: mini_gas.IEntityState, owner_module: mini_gas.IEntityModule, ability_id: mini_gas.ID, effect_id: mini_gas.ID, modifier_def: mini_gas.ModifierDef, target_entity: mini_gas.IEntityState, target_module: mini_gas.IEntityModule, ...: unknown)
----@field step? fun(context: mini_gas.IContext, phase: string, ...: unknown)
+---@field step? fun(context: mini_gas.IContext, phase: mini_gas.DebugStepPhase, ...: unknown)
 ```
 
 ### 5.6 ApplyFun
 
 ```lua
----@alias mini_gas.ApplyFun fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, tags: table<mini_gas.Tag, boolean>, attributes: table<mini_gas.ID, number>, ...: unknown)
+---@alias mini_gas.ApplyFun fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, tags: table<mini_gas.Tag, boolean>, attribute_deltas: table<mini_gas.ID, number>, ...: unknown)
 ```
 
 ### 5.7 ModifierDef
@@ -112,10 +113,10 @@ local EEffectTarget = {
 ---@field allof_tags? mini_gas.Tag[]
 ---@field anyof_tags? mini_gas.Tag[]
 ---@field noneof_tags? mini_gas.Tag[]
----@field requires_count integer
+---@field requires_count? integer 激活所需的最小匹配实体数量；当满足上述标签约束的实体数量大于等于该值时，Ability 激活；省略时默认值为 1；设为 0 时表示无需匹配任何实体即可激活
 ---@field include_self? boolean
 
----@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, ...
+---@alias mini_gas.AbilityActivateConditionFunc fun(context: mini_gas.IContext, entity: mini_gas.IEntityState, def: mini_gas.AbilityDef, ...: unknown): boolean, any, ...
 
 ---@class mini_gas.AbilityDef
 ---@field id mini_gas.ID

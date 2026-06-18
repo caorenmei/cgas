@@ -1,5 +1,5 @@
 --- MiniGas V2 内部对象池
---- 仅保留两种表池与两种数组池：
+--- 保留一个键值表池与两个数组池：
 ---   - table_pool：复用键值型临时表，回收时遍历 pairs 清空
 ---   - short_array_pool：复用短数组型临时表，回收时按 t.n 逐个置 false
 ---   - long_array_pool：复用长数组型临时表，语义与 short_array_pool 相同，
